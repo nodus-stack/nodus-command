@@ -9,7 +9,7 @@
   },
   "main": "bin/noduscm.js",
   "bin": {
-    "noduscm": "./bin/noduscm.js"
+    "noduscm": "bin/noduscm.js"
   },
   "scripts": {
     "test": "vitest run",
