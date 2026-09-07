@@ -1,4 +1,4 @@
-FROM php:8.4-apache
+FROM php:8.6-rc-fpm-alpine3.24
 
 ARG LOCAL_DOMAIN=localhost
 ARG LOCAL_HTTPS=false
