@@ -382,7 +382,7 @@ export async function promptProjectInit(cliOptions = {}) {
             type: 'input',
             name: 'mount',
             message: 'Mount entry (<local-path>:<container-path>[:mode]):',
-            default: '/home/jesusuzcategui/WorkspacePHP/Juzt-Extension-Template:/var/www/html/wp-content/plugins/juzt-extension-template:z',
+            default: '/home/jesusuzcategui/WorkspacePHP/Nodus-Extension-Template:/var/www/html/wp-content/plugins/nodus-extension-template:z',
             validate: validateMountEntry,
             filter: (input) => String(input).trim()
           }

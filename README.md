@@ -33,15 +33,15 @@ Install PODMAN desktop [Learn more here](https://podman-desktop.io)
 
 ```bash
 # Install via PNPM
-pnpm install -g noduscm
+pnpm install -g nodus-command
 ```
 
 ### Or
 
 ```bash
 # Clone the repository
-git clone https://github.com/juztstack/NodusCommand.git
-cd noduscm
+git clone https://github.com/nodus-stack/nodus-command.git
+cd nodus-command
 
 # Install dependencies
 npm install
@@ -93,8 +93,8 @@ noduscm init
 
 # Init with predefined local repo mounts (no mount prompt)
 noduscm init \
-  --mount /home/jesusuzcategui/WorkspacePHP/Juzt-Extension-Template:/var/www/html/wp-content/plugins/juzt-extension-template:z \
-  --mount /home/jesusuzcategui/WorkspacePHP/Juzt-Orbit:/var/www/html/wp-content/themes/juzt-orbit:z
+  --mount /home/User/WorkspacePHP/Nodus-Extension-Template:/var/www/html/wp-content/plugins/nodus-extension-template:z \
+  --mount /home/User/WorkspacePHP/Nodus-Apex:/var/www/html/wp-content/themes/nodus-apex:z
 ```
 
 ### `noduscm up`
@@ -158,8 +158,8 @@ noduscm pull --db-only
 # Only pull uploads folder
 noduscm pull --uploads-only
 
-# Only pull a specific path (remotePath + /wp-content/themes/juzt-orbit)
-noduscm pull --specified-path=/wp-content/themes/juzt-orbit
+# Only pull a specific path (remotePath + /wp-content/themes/nodus-apex)
+noduscm pull --specified-path=/wp-content/themes/nodus-apex
 
 # Pull multiple specific paths with one argument (brace expansion)
 noduscm pull --specified-path='/wp-content/{uploads,mu-plugins}'
@@ -171,7 +171,7 @@ noduscm pull \
 
 # Pull wp-content excluding selected paths
 noduscm pull --specified-path /wp-content \
-  --exclude /wp-content/themes/juzt-orbit \
+  --exclude /wp-content/themes/nodus-apex \
   --exclude /wp-content/plugins/juzt-extensention-raffles
 
 # Pull all files but exclude selected directories
@@ -274,7 +274,7 @@ NodusCommand stores project configuration in `.noduscm.json`:
     }
   },
   "mounts": [
-    "/home/[USER]/juzt-extension-template:/var/www/html/wp-content/plugins/juzt-extension-template:z"
+    "/home/[USER]/nodus-extension-template:/var/www/html/wp-content/plugins/nodus-extension-template:z"
   ],
   "env": {
     "MY_PASSWORD_FOR_SOMETHING": "VALUE"
@@ -344,7 +344,7 @@ You can persist default excludes in `.noduscm.json` so you don't need to pass `-
 {
   "pullDefaults": {
     "exclude": [
-      "/wp-content/themes/juzt-orbit",
+      "/wp-content/themes/nodus-apex",
       "/wp-content/plugins/juzt-extensention-raffles"
     ]
   }
@@ -476,15 +476,16 @@ MIT
 
 ## Author
 
-Jesus Uzcategui [@jesusuzcategui](https://github.com/jesusuzcategui)
+Jesus Uzcategui [@User](https://github.com/jesusuzcategui)
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/Q5Q31P7KUS)
 
-## Part of Juzt Stack Ecosystem
+## Part of Nodus Stack Ecosystem
 
-- **Juzt Orbit** - WordPress Theme [Repository](https://github.com/juztstack/Juzt-Orbit)
-- **Juzt Studio** - Template Builder/Customizer [Repository](https://github.com/juztstack/juzt-studio-community-version)
-- **Juzt Deploy** - GitHub Deployment & Previews - [Repository](https://github.com/juztstack/juzt-deploy-basic)
+- **Nodus Apex** - WordPress Theme [Repository](https://github.com/nodus-stack/nodus-apex)
+- **Nodus Designer** - Template Builder/Customizer [Repository](https://github.com/nodus-stack/nodus-designer)
+- **Nodus Jet** - GitHub Deployment & Previews - [Repository](https://github.com/nodus-stack/nodus-jet)
+- **Nodus Extension Template** - Starter Plugin Template [Repository](https://github.com/nodus-stack/Nodus-Extension-Template)
 
 ---
 

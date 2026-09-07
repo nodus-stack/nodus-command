@@ -77,6 +77,6 @@ export function showBanner() {
   console.log(`    ${chalk.cyan('backup')}      Backup local database`);
   
   console.log(chalk.bold('\n  Documentation:\n'));
-  console.log(`    ${chalk.gray('https://juztstack.com/docs/noduscm')}`);
+  console.log(`    ${chalk.gray('https://github.com/nodus-stack/nodus-command')}`);
   console.log('');
 }
