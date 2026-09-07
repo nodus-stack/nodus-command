@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  apache:
+    build:
+      context: .
+      dockerfile: Dockerfile.apache
+      args:
+        LOCAL_DOMAIN: {{DOMAIN}}
+        LOCAL_HTTPS: {{LOCAL_HTTPS}}
+    container_name: {{PROJECT_SLUG}}-apache
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    depends_on:
+      - mysql
+    ports:
+{{APACHE_PORT_BINDINGS}}  # Acceso directo sin Traefik
+    volumes:
+      - ./wordpress:/var/www/html:z
+      - ./wp-content:/var/www/html/wp-content:z
+      - ./apache.conf:/etc/apache2/sites-available/000-default.conf:z
+{{APACHE_HTTPS_CERT_VOLUME}}
+{{PHP_INI_VOLUME}}
+{{APACHE_EXTRA_VOLUMES}}
+    environment:
+      - WORDPRESS_DB_HOST={{DB_HOST}}
+      - WORDPRESS_DB_NAME={{DB_NAME}}
+      - WORDPRESS_DB_USER={{DB_USER}}
+      - WORDPRESS_DB_PASSWORD={{DB_PASSWORD}}
+{{APACHE_EXTRA_ENV}}
+    networks:
+      - noduscm
+
+  mysql:
+    image: mysql:8.0
+    container_name: {{PROJECT_SLUG}}-mysql
+    ports:
+{{MYSQL_PORT_BINDING}}  # Exponer el puerto para conexiones externas
+    environment:
+      - MYSQL_ROOT_PASSWORD={{MYSQL_ROOT_PASSWORD}}
+      - MYSQL_DATABASE={{DB_NAME}}
+      - MYSQL_USER={{DB_USER}}
+      - MYSQL_PASSWORD={{DB_PASSWORD}}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - noduscm
+
+volumes:
+  mysql_data:
+
+networks:
+  noduscm:
+    driver: bridge  # No requiere red externa

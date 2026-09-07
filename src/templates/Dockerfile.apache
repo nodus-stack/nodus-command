@@ -1,0 +1,83 @@
+FROM php:8.4-apache
+
+ARG LOCAL_DOMAIN=localhost
+ARG LOCAL_HTTPS=false
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    libfreetype6-dev \
+    libjpeg62-turbo-dev \
+    libwebp-dev \
+    libpng-dev \
+    libzip-dev \
+    libonig-dev \
+    libxml2-dev \
+    curl \
+    openssl \
+    sudo \
+    gosu \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PHP extensions required by WordPress
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+    && docker-php-ext-install -j$(nproc) \
+    gd \
+    mysqli \
+    pdo \
+    pdo_mysql \
+    zip \
+    exif \
+    mbstring \
+    xml
+
+# Enable Apache modules
+RUN a2enmod rewrite headers expires ssl
+
+# Self-signed certificate for local HTTPS
+RUN mkdir -p /etc/apache2/ssl \
+        && if [ "$LOCAL_HTTPS" = "true" ]; then \
+            openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
+                -keyout /etc/apache2/ssl/local.key \
+                -out /etc/apache2/ssl/local.crt \
+                -subj "/C=US/ST=Local/L=Local/O=NodusCommand/CN=${LOCAL_DOMAIN}" \
+                -addext "subjectAltName=DNS:localhost,DNS:${LOCAL_DOMAIN}"; \
+        else \
+            openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
+                -keyout /etc/apache2/ssl/local.key \
+                -out /etc/apache2/ssl/local.crt \
+                -subj "/C=US/ST=Local/L=Local/O=NodusCommand/CN=localhost" \
+                -addext "subjectAltName=DNS:localhost"; \
+        fi
+
+# Install WP-CLI
+RUN curl -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
+    && chmod +x /usr/local/bin/wp
+
+# Create webuser (UID 1000) — mirrors cPanel-style web user
+# Primary group: www-data (so Apache workers can read files)
+RUN useradd -m -u 1000 -g www-data -s /bin/bash webuser \
+    && echo "webuser:webuser" | chpasswd \
+    && printf 'Defaults !requiretty\nDefaults:webuser !env_reset\nwebuser ALL=(ALL) NOPASSWD: ALL\n' \
+       > /etc/sudoers.d/webuser \
+    && chmod 0440 /etc/sudoers.d/webuser
+
+# Apache master runs as root (needs port 80), workers run as webuser — same as cPanel
+RUN sed -i 's/export APACHE_RUN_USER=www-data/export APACHE_RUN_USER=webuser/' /etc/apache2/envvars
+
+# Set working directory and ownership
+WORKDIR /var/www/html
+RUN chown -R webuser:www-data /var/www/html \
+    && chmod -R 775 /var/www/html \
+    && chmod g+s /var/www/html
+
+# Wrapper so sudo can start Apache without needing -E (no env preservation required)
+RUN printf '#!/bin/sh\nexec /usr/local/bin/apache2-foreground "$@"\n' > /usr/local/bin/start-apache \
+    && chmod +x /usr/local/bin/start-apache
+
+# Default interactive user: webuser (podman/docker exec lands here without -u flag)
+# Apache starts via sudo wrapper so it can bind port 80
+USER webuser
+CMD ["sudo", "/usr/local/bin/start-apache"]
+
+EXPOSE 80
+EXPOSE 443

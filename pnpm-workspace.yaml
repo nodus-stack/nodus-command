@@ -1,0 +1,5 @@
+allowBuilds:
+  cpu-features: true
+  ssh2: true
+overrides:
+  nodus-command: 'link:'
