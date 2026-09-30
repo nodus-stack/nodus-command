@@ -73,7 +73,7 @@ export async function themeInitCommand(options) {
     spinner.succeed(chalk.green(`Theme "${created.slug}" created`));
 
     console.log(`\n  Folder   ${dir}`);
-    console.log(`  Preview  ${previewUrl(site, created.slug)} ${chalk.gray('(log in to wp-admin first)')}\n`);
+    console.log(`  Preview  ${previewUrl(site, created.slug)}\n`);
   } catch (err) {
     fail(err);
   }
@@ -162,7 +162,7 @@ export async function themeDevCommand(options) {
     const rules = compileIgnore(); // el ignore de usuario se aplica al construir el manifiesto
 
     console.log(chalk.bold(`\nWatching ${dir}`));
-    console.log(`Preview: ${chalk.cyan(previewUrl(ctx.site, ctx.theme))} ${chalk.gray('(log in to wp-admin in this browser)')}\n`);
+    console.log(`Preview: ${chalk.cyan(previewUrl(ctx.site, ctx.theme))}\n`);
 
     let running = false;
     let pending = false;

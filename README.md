@@ -33,7 +33,7 @@ cd my-theme
 
 # 3. Work: push once, or watch and push on every save
 noduscm theme push            # --dry-run to preview, --delete to remove server-only files
-noduscm theme dev             # prints the preview URL (log in to wp-admin to see it)
+noduscm theme dev             # prints the preview URL (public link, shareable)
 
 # Other machine / get server changes
 noduscm theme clone my-theme --site https://example.com
