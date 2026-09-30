@@ -522,6 +522,99 @@ async function pullFilesFromContainer(config, paths, spinner, containerId, exclu
   }
 }
 
+// Tables with STORED generated columns — mysqldump on MariaDB (unlike
+// MySQL 8.0.16+, which stopped dumping generated-column values entirely)
+// still writes them as literal values in INSERT statements. Importing
+// that back into a table where the column is still `GENERATED ALWAYS AS
+// (...) STORED` fails with ERROR 3105 ("value specified for generated
+// column ... is not allowed") — real, recurring failure confirmed
+// against clicktalk's remote (MariaDB 11.8.9). The column's value is
+// fully derivable from other real columns in the same row, so it's safe
+// to drop from the dump — MariaDB recomputes it on INSERT once the
+// backing columns are set. Add more { table, column } entries here if
+// another generated column starts causing the same failure.
+const GENERATED_COLUMNS_TO_STRIP = [
+  { table: 'wp_class_bookings', column: 'active_scheduled_at' },
+];
+
+// Removes one column (by name) from a --complete-insert, one-row-per-line
+// INSERT statement — both flags are required for this to be safe: named
+// columns make the target unambiguous, and one row per line means a
+// naive split on `),(` never risks slicing through a string value that
+// happens to contain those characters.
+function stripGeneratedColumnFromInsert(sql, table, column) {
+  const insertRe = new RegExp(
+    `^INSERT INTO \`${table}\` \\(([^)]*)\\) VALUES \\((.*)\\);$`
+  );
+
+  return sql
+    .split('\n')
+    .map((line) => {
+      const match = line.match(insertRe);
+      if (!match) return line;
+
+      const columns = match[1].split(',').map((c) => c.trim().replace(/^`|`$/g, ''));
+      const colIndex = columns.indexOf(column);
+      if (colIndex === -1) return line;
+
+      const values = splitSqlValueList(match[2]);
+      if (values.length !== columns.length) return line; // shape mismatch — leave untouched, don't risk corrupting the row
+
+      columns.splice(colIndex, 1);
+      values.splice(colIndex, 1);
+
+      return `INSERT INTO \`${table}\` (${columns.map((c) => `\`${c}\``).join(', ')}) VALUES (${values.join(', ')});`;
+    })
+    .join('\n');
+}
+
+// Splits a single VALUES(...) tuple's inner content on top-level commas —
+// a plain .split(',') breaks on any comma inside a quoted string value
+// (event summaries, JSON blobs, etc. routinely contain them). Tracks
+// quote state and escape sequences to only split where MySQL actually
+// would.
+function splitSqlValueList(inner) {
+  const parts = [];
+  let current = '';
+  let inString = false;
+  let quoteChar = '';
+
+  for (let i = 0; i < inner.length; i++) {
+    const char = inner[i];
+
+    if (inString) {
+      current += char;
+      if (char === '\\') {
+        // Escaped char — consume the next one too so we don't
+        // misinterpret e.g. \' as the string terminator.
+        i++;
+        if (i < inner.length) current += inner[i];
+        continue;
+      }
+      if (char === quoteChar) inString = false;
+      continue;
+    }
+
+    if (char === "'" || char === '"') {
+      inString = true;
+      quoteChar = char;
+      current += char;
+      continue;
+    }
+
+    if (char === ',') {
+      parts.push(current.trim());
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+  if (current.trim() !== '') parts.push(current.trim());
+
+  return parts;
+}
+
 async function pullDatabase(config, paths, spinner) {
   if (!config.ssh.database) {
     console.log(chalk.yellow('\n⚠️  No remote database configured, skipping DB pull\n'));
@@ -533,21 +626,58 @@ async function pullDatabase(config, paths, spinner) {
 
   console.log(chalk.cyan('\n🗄 Pulling remote database...\n'));
 
-  // 1. Dump remote DB
+  // 1. Dump remote DB. Tables with a STORED generated column dump
+  //    separately with --complete-insert --extended-insert=FALSE (named
+  //    columns, one row per line) so their INSERTs can be safely
+  //    post-processed below — everything else keeps mysqldump's default,
+  //    faster extended-insert format.
   spinner.start('Dumping remote database...');
   try {
     const dumpStream = fs.createWriteStream(dumpLocalPath);
+    const genTables = GENERATED_COLUMNS_TO_STRIP.map((g) => g.table);
+    const ignoreFlags = genTables
+      .map((t) => `--ignore-table=${config.ssh.database.name}.${t}`)
+      .join(' ');
 
-    const sshProcess = execa('ssh', [
+    const mainDumpCmd = `mysqldump -h${config.ssh.database.host} -u${config.ssh.database.user} -p${config.ssh.database.password} ${ignoreFlags} ${config.ssh.database.name}`;
+
+    const mainDump = execa('ssh', [
       '-p', config.ssh.port,
       '-i', config.ssh.keyFile,
       `${config.ssh.user}@${config.ssh.host}`,
-      `mysqldump -h${config.ssh.database.host} -u${config.ssh.database.user} -p${config.ssh.database.password} ${config.ssh.database.name}`
+      mainDumpCmd
     ]);
+    let mainDumpOutput = '';
+    mainDump.stdout.on('data', (chunk) => { mainDumpOutput += chunk; });
+    await mainDump;
 
-    sshProcess.stdout.pipe(dumpStream);
+    let genTablesOutput = '';
+    for (const t of genTables) {
+      const tableDumpCmd = `mysqldump -h${config.ssh.database.host} -u${config.ssh.database.user} -p${config.ssh.database.password} --complete-insert --extended-insert=FALSE ${config.ssh.database.name} ${t}`;
+      const tableDump = execa('ssh', [
+        '-p', config.ssh.port,
+        '-i', config.ssh.keyFile,
+        `${config.ssh.user}@${config.ssh.host}`,
+        tableDumpCmd
+      ]);
+      let out = '';
+      tableDump.stdout.on('data', (chunk) => { out += chunk; });
+      await tableDump;
 
-    await sshProcess;
+      for (const g of GENERATED_COLUMNS_TO_STRIP) {
+        if (g.table !== t) continue;
+        out = stripGeneratedColumnFromInsert(out, g.table, g.column);
+      }
+      genTablesOutput += out;
+    }
+
+    dumpStream.write(mainDumpOutput);
+    dumpStream.write(genTablesOutput);
+    dumpStream.end();
+    await new Promise((resolve, reject) => {
+      dumpStream.on('finish', resolve);
+      dumpStream.on('error', reject);
+    });
 
     spinner.succeed('Database dumped successfully');
   } catch (err) {

@@ -1,4 +1,6 @@
-FROM php:8.6-rc-fpm-alpine3.24
+FROM composer:2 AS composer
+
+FROM php:8.4-apache
 
 ARG LOCAL_DOMAIN=localhost
 ARG LOCAL_HTTPS=false
@@ -52,6 +54,10 @@ RUN mkdir -p /etc/apache2/ssl \
 # Install WP-CLI
 RUN curl -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
     && chmod +x /usr/local/bin/wp
+
+# Install Composer (mpdf/mpdf and other project dependencies need it; the
+# gd extension it may require is already installed above)
+COPY --from=composer /usr/bin/composer /usr/local/bin/composer
 
 # Create webuser (UID 1000) — mirrors cPanel-style web user
 # Primary group: www-data (so Apache workers can read files)
