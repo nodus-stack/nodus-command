@@ -141,7 +141,7 @@ export async function buildLocalManifest(dir) {
         if (!isSyncablePath(rel)) {
           skipped.push({
             path: rel,
-            reason: entry.name.startsWith('.') ? 'hidden files are never synced' : 'file type or name blocked by the site',
+            reason: rel.split('/').some((seg) => seg.startsWith('.')) ? 'hidden files and folders are never synced' : 'file type or name blocked by the site',
           });
           continue;
         }
