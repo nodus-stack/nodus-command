@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `.noduscmignore` (defaults: `node_modules/`, `.git/`, `*.map`, `.env`). Only whitelisted extensions are synced; dotfiles are never sent.
 - **Plugin sync (experiment):** `noduscm plugin list | init | clone | push | pull | dev`, same flow as themes against `/wp-json/nodus-jet/v1/plugins`. Files only: plugins are never activated, deactivated or previewed from the CLI (activate them in wp-admin). The folder context is stored in `.noduscm/plugin.json`; running `theme …` in a plugin folder (or vice versa) fails with a clear message. PHP syntax errors are rejected by the site with the file and line, and the whole batch is not written.
 - **Media files and larger files:** `mp4`, `webm`, `ogg`, `mp3`, `wav`, `pdf` and `bmp` are now synced (themes and plugins). Per-file limit raised from 2 MB to 16 MB (the site can lower or raise it with the `nodus_jet_cli_max_file_bytes` filter); big files travel alone in their own request, and `pull`/`clone` fetch what doesn't fit in one response in follow-up requests.
+- **No more extension whitelist:** all development files sync (jsx, tsx, ts, scss, vue, yml, lock files, extensionless files like `Makefile`, paths with spaces or `[slug].jsx`). Only hidden files, `phar/phtml/pht/phps/php3-8`, `exe/dll/so/dylib/msi` and `web.config` are blocked, and they are reported as `⚠ skipped` with the reason (previously some were skipped silently). `.noduscmignore` is ignored by default.
+- `push` and `pull` now list every file they upload/download/delete before starting, and `dev` lists the files of each sync.
 - Dependency: `chokidar` (file watching).
 
 ## [1.3.0] - 2026-03-27

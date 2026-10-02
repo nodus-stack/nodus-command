@@ -8,18 +8,18 @@ export const CONTEXT_FILES = { theme: 'theme.json', plugin: 'plugin.json' };
 export const CONTEXT_FILE = CONTEXT_FILES.theme;
 export const IGNORE_FILE = '.noduscmignore';
 
-// Deben coincidir con las reglas del servidor (CliSync en Nodus Jet).
-export const ALLOWED_EXTENSIONS = new Set([
-  'php', 'js', 'mjs', 'css', 'json', 'twig', 'html', 'svg', 'xml', 'txt', 'md',
-  'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'ico',
-  'woff', 'woff2', 'ttf', 'otf', 'eot', 'po', 'pot', 'mo',
-  'mp4', 'webm', 'ogg', 'mp3', 'wav', 'pdf', 'bmp',
+// Deben coincidir con las reglas del servidor (CliSync en Nodus Jet): se sincroniza todo el
+// código de desarrollo (jsx, tsx, ts, scss, vue, lock, yml...) salvo estas excepciones.
+export const DENIED_EXTENSIONS = new Set([
+  'phar', 'phtml', 'pht', 'phps', 'php3', 'php4', 'php5', 'php6', 'php7', 'php8',
+  'exe', 'dll', 'so', 'dylib', 'msi',
 ]);
+export const DENIED_FILENAMES = new Set(['web.config']);
 export const MAX_FILE_BYTES = 16 * 1024 * 1024; // el sitio puede bajarlo con el filtro nodus_jet_cli_max_file_bytes
 const BATCH_FILES = 100;
 const BATCH_BYTES = 3 * 1024 * 1024;
 
-const DEFAULT_IGNORE = ['node_modules/', '.git/', '.noduscm/', '*.map', '.env', '.DS_Store'];
+const DEFAULT_IGNORE = ['node_modules/', '.git/', '.noduscm/', '.noduscmignore', '*.map', '.env', '.DS_Store'];
 
 // ---------------------------------------------------------------------------
 // Contexto local del tema (.noduscm/theme.json)
@@ -63,11 +63,13 @@ export async function saveContext(dir, ctx) {
 // ---------------------------------------------------------------------------
 
 export function isSyncablePath(rel) {
-  if (!rel || rel.length > 240 || rel.startsWith('/')) return false;
-  if (!/^[A-Za-z0-9._@/-]+$/.test(rel)) return false;
-  if (rel.split('/').some((seg) => seg === '' || seg.startsWith('.'))) return false;
+  if (!rel || rel.length > 400 || rel.startsWith('/')) return false;
+  if (rel.includes('\\') || !/^[^\x00-\x1F\x7F:*?"<>|]+$/u.test(rel)) return false;
+  const segments = rel.split('/');
+  if (segments.some((seg) => seg === '' || seg.startsWith('.'))) return false;
+  if (DENIED_FILENAMES.has(segments[segments.length - 1].toLowerCase())) return false;
   const ext = path.posix.extname(rel).slice(1).toLowerCase();
-  return ALLOWED_EXTENSIONS.has(ext);
+  return !DENIED_EXTENSIONS.has(ext);
 }
 
 function globToRegExp(glob) {
@@ -136,9 +138,11 @@ export async function buildLocalManifest(dir) {
       if (entry.isDirectory()) {
         await walk(path.join(current, entry.name), rel);
       } else if (entry.isFile()) {
-        if (entry.name.startsWith('.')) continue;
         if (!isSyncablePath(rel)) {
-          skipped.push({ path: rel, reason: 'extension or name not allowed' });
+          skipped.push({
+            path: rel,
+            reason: entry.name.startsWith('.') ? 'hidden files are never synced' : 'file type or name blocked by the site',
+          });
           continue;
         }
         const buffer = await fs.readFile(path.join(current, entry.name));
@@ -169,7 +173,7 @@ async function fetchServerManifest(ctx, token) {
   return api(ctx.site, 'GET', `${apiBase(ctx)}/manifest`, { token });
 }
 
-export async function pushTheme(dir, ctx, token, { del = false, dryRun = false, force = false, onProgress = () => {} } = {}) {
+export async function pushTheme(dir, ctx, token, { del = false, dryRun = false, force = false, onProgress = () => {}, onPlan = () => {} } = {}) {
   const { manifest: local, skipped } = await buildLocalManifest(dir);
   const diff = await api(ctx.site, 'POST', `${apiBase(ctx)}/manifest`, { token, body: { files: local } });
 
@@ -188,6 +192,8 @@ export async function pushTheme(dir, ctx, token, { del = false, dryRun = false, 
   if (dryRun || (upload.length === 0 && remove.length === 0)) {
     return summary;
   }
+
+  onPlan(summary); // lista lo que se va a subir/borrar antes de empezar
 
   // Lotes por número de archivos y tamaño.
   let batch = [];
@@ -223,7 +229,7 @@ export async function pushTheme(dir, ctx, token, { del = false, dryRun = false, 
   return summary;
 }
 
-export async function pullTheme(dir, ctx, token, { del = false, dryRun = false, force = false, onProgress = () => {} } = {}) {
+export async function pullTheme(dir, ctx, token, { del = false, dryRun = false, force = false, onProgress = () => {}, onPlan = () => {} } = {}) {
   const server = await fetchServerManifest(ctx, token);
   const { manifest: local } = await buildLocalManifest(dir);
   const lastFiles = ctx.lastSyncFiles || {};
@@ -248,6 +254,8 @@ export async function pullTheme(dir, ctx, token, { del = false, dryRun = false, 
 
   const summary = { download, remove, downloaded: 0, deleted: 0 };
   if (dryRun) return summary;
+
+  if (download.length || remove.length) onPlan(summary);
 
   let done = 0;
   for (const group of chunk(download, 50)) {

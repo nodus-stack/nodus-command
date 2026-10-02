@@ -32,7 +32,7 @@ noduscm theme init --name "My Theme"
 cd my-theme
 
 # 3. Work: push once, or watch and push on every save
-noduscm theme push            # --dry-run to preview, --delete to remove server-only files
+noduscm theme push            # lists every file it uploads; --dry-run to preview, --delete to remove server-only files
 noduscm theme dev             # prints the preview URL (public link, shareable)
 
 # Other machine / get server changes
@@ -44,7 +44,7 @@ Notes:
 - Only themes created with `theme init` are writable from the CLI. Other themes are never touched.
 - Sessions last 12 h of inactivity and can be revoked from wp-admin or with `noduscm logout`.
 - Ignore files with `.noduscmignore` (same idea as `.gitignore`, simple patterns).
-- Synced types: code/text (`php js css json twig html svg xml txt md po mo`), images, fonts and media (`mp4 webm ogg mp3 wav pdf`). Max 16 MB per file; larger files are skipped with a notice. Archives (`zip`) and executables are never synced.
+- Everything a project needs is synced (php, js/jsx/ts/tsx, css/scss, vue, json, lock files, yml, images, fonts, media…). Never synced: hidden files (`.env`, `.htaccess`, `.eslintrc`…), `phar/phtml/php3-8/exe/dll/so/dylib/msi` and `web.config`. Max 16 MB per file. Anything skipped is listed with a `⚠ skipped` notice and the reason; use `.noduscmignore` for what you don't want (e.g. `vendor/`).
 - This is a proof of concept: no live reload yet, and `theme publish` is not implemented.
 
 ### Plugins (experiment)

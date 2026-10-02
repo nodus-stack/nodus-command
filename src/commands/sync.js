@@ -39,7 +39,7 @@ export function createSyncCommands(kind) {
     const list = kind === 'push' ? s.upload : s.download;
     for (const rel of list) console.log(`  ${chalk.green(kind === 'push' ? '↑' : '↓')} ${rel}`);
     for (const rel of s.remove) console.log(`  ${chalk.red('✕')} ${rel}`);
-    for (const sk of s.skipped || []) console.log(chalk.gray(`  – skipped ${sk.path} (${sk.reason})`));
+    for (const sk of s.skipped || []) console.log(`  ${chalk.yellow('⚠ skipped')} ${sk.path} ${chalk.gray(`(${sk.reason})`)}`);
   }
 
   async function list(options) {
@@ -126,6 +126,11 @@ export function createSyncCommands(kind) {
         del: options.delete,
         dryRun: options.dryRun,
         force: options.force,
+        onPlan: (plan) => {
+          spinner.stop();
+          printSummary('push', plan);
+          spinner.start('Pushing...');
+        },
         onProgress: (d, t) => (spinner.text = `Pushing ${d}/${t} files...`),
       }).catch((err) => {
         spinner.fail('Push failed');
@@ -137,7 +142,8 @@ export function createSyncCommands(kind) {
           ? `Dry run: ${s.upload.length} to upload, ${s.remove.length} to delete`
           : `Pushed ${s.uploaded} files${options.delete ? `, deleted ${s.deleted}` : ''} (${s.unchanged} unchanged)`,
       );
-      printSummary('push', s);
+      if (options.dryRun || s.upload.length + s.remove.length === 0) printSummary('push', s);
+
       if (!options.delete) console.log(chalk.gray('  (files only on the server are kept; use --delete to remove them)'));
       console.log();
     } catch (err) {
@@ -153,6 +159,11 @@ export function createSyncCommands(kind) {
         del: options.delete,
         dryRun: options.dryRun,
         force: options.force,
+        onPlan: (plan) => {
+          spinner.stop();
+          printSummary('pull', plan);
+          spinner.start('Pulling...');
+        },
         onProgress: (d, t) => (spinner.text = `Pulling ${d}/${t} files...`),
       }).catch((err) => {
         spinner.fail('Pull failed');
@@ -164,7 +175,7 @@ export function createSyncCommands(kind) {
           ? `Dry run: ${s.download.length} to download, ${s.remove.length} to delete`
           : `Pulled ${s.downloaded} files${options.delete ? `, deleted ${s.deleted}` : ''}`,
       );
-      printSummary('pull', s);
+      if (options.dryRun) printSummary('pull', s);
       console.log();
     } catch (err) {
       fail(err);
@@ -198,6 +209,9 @@ export function createSyncCommands(kind) {
           if (s.uploaded || s.deleted || initial) {
             const time = new Date().toLocaleTimeString();
             console.log(`${chalk.gray(time)} ${chalk.green('✔')} ${s.uploaded} uploaded${s.deleted ? `, ${s.deleted} deleted` : ''} ${chalk.gray(`(${Date.now() - started} ms)`)}`);
+            for (const rel of s.upload) console.log(`  ${chalk.green('↑')} ${rel}`);
+            for (const rel of s.remove) console.log(`  ${chalk.red('✕')} ${rel}`);
+            if (initial) for (const sk of s.skipped || []) console.log(`  ${chalk.yellow('⚠ skipped')} ${sk.path} ${chalk.gray(`(${sk.reason})`)}`);
           }
         } catch (err) {
           console.log(`${chalk.gray(new Date().toLocaleTimeString())} ${chalk.red('✖')} ${err.message}`);
