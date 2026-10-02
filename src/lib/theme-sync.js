@@ -13,8 +13,9 @@ export const ALLOWED_EXTENSIONS = new Set([
   'php', 'js', 'mjs', 'css', 'json', 'twig', 'html', 'svg', 'xml', 'txt', 'md',
   'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'ico',
   'woff', 'woff2', 'ttf', 'otf', 'eot', 'po', 'pot', 'mo',
+  'mp4', 'webm', 'ogg', 'mp3', 'wav', 'pdf', 'bmp',
 ]);
-export const MAX_FILE_BYTES = 2 * 1024 * 1024;
+export const MAX_FILE_BYTES = 16 * 1024 * 1024; // el sitio puede bajarlo con el filtro nodus_jet_cli_max_file_bytes
 const BATCH_FILES = 100;
 const BATCH_BYTES = 3 * 1024 * 1024;
 
@@ -142,7 +143,7 @@ export async function buildLocalManifest(dir) {
         }
         const buffer = await fs.readFile(path.join(current, entry.name));
         if (buffer.length > MAX_FILE_BYTES) {
-          skipped.push({ path: rel, reason: 'larger than 2 MB' });
+          skipped.push({ path: rel, reason: `larger than ${MAX_FILE_BYTES / 1024 / 1024} MB` });
           continue;
         }
         manifest[rel] = sha1(buffer);
@@ -249,18 +250,25 @@ export async function pullTheme(dir, ctx, token, { del = false, dryRun = false, 
   if (dryRun) return summary;
 
   let done = 0;
-  for (const paths of chunk(download, 50)) {
-    const res = await api(ctx.site, 'POST', `${apiBase(ctx)}/download`, { token, body: { paths } });
-    for (const file of res.files) {
-      if (!isSyncablePath(file.path)) continue; // nunca confiar en rutas del servidor
-      const target = path.resolve(dir, file.path);
-      if (!target.startsWith(path.resolve(dir) + path.sep)) continue;
-      await fs.ensureDir(path.dirname(target));
-      await fs.writeFile(target, Buffer.from(file.content_b64, 'base64'));
-      summary.downloaded++;
+  for (const group of chunk(download, 50)) {
+    // El servidor limita el tamaño de cada respuesta: lo que no cabe vuelve en `deferred`.
+    let paths = group;
+    while (paths.length) {
+      const res = await api(ctx.site, 'POST', `${apiBase(ctx)}/download`, { token, body: { paths } });
+      for (const file of res.files) {
+        if (!isSyncablePath(file.path)) continue; // nunca confiar en rutas del servidor
+        const target = path.resolve(dir, file.path);
+        if (!target.startsWith(path.resolve(dir) + path.sep)) continue;
+        await fs.ensureDir(path.dirname(target));
+        await fs.writeFile(target, Buffer.from(file.content_b64, 'base64'));
+        summary.downloaded++;
+      }
+      const deferred = (res.deferred || []).filter((rel) => paths.includes(rel));
+      done += paths.length - deferred.length;
+      onProgress(done, download.length);
+      if (deferred.length >= paths.length) break; // sin progreso: evita bucle infinito
+      paths = deferred;
     }
-    done += paths.length;
-    onProgress(done, download.length);
   }
 
   for (const rel of remove) {

@@ -44,6 +44,7 @@ Notes:
 - Only themes created with `theme init` are writable from the CLI. Other themes are never touched.
 - Sessions last 12 h of inactivity and can be revoked from wp-admin or with `noduscm logout`.
 - Ignore files with `.noduscmignore` (same idea as `.gitignore`, simple patterns).
+- Synced types: code/text (`php js css json twig html svg xml txt md po mo`), images, fonts and media (`mp4 webm ogg mp3 wav pdf`). Max 16 MB per file; larger files are skipped with a notice. Archives (`zip`) and executables are never synced.
 - This is a proof of concept: no live reload yet, and `theme publish` is not implemented.
 
 ### Plugins (experiment)
