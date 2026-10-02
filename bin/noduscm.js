@@ -21,6 +21,14 @@ import {
   themePullCommand,
   themePushCommand,
 } from "../src/commands/theme/index.js";
+import {
+  pluginCloneCommand,
+  pluginDevCommand,
+  pluginInitCommand,
+  pluginListCommand,
+  pluginPullCommand,
+  pluginPushCommand,
+} from "../src/commands/plugin/index.js";
 import { showBanner, renderLogo } from "../src/ui/banner.js";
 
 const program = new Command();
@@ -166,55 +174,84 @@ program
   .option("--site <url>", "Site URL (optional if only one is logged in)")
   .action(whoamiCommand);
 
-const theme = program
-  .command("theme")
-  .description("Sync WordPress themes with a Nodus Jet site (no SSH)");
+const syncGroups = [
+  {
+    kind: "theme",
+    group: "WordPress themes",
+    actions: {
+      list: themeListCommand,
+      init: themeInitCommand,
+      clone: themeCloneCommand,
+      push: themePushCommand,
+      pull: themePullCommand,
+      dev: themeDevCommand,
+    },
+  },
+  {
+    kind: "plugin",
+    group: "WordPress plugins",
+    actions: {
+      list: pluginListCommand,
+      init: pluginInitCommand,
+      clone: pluginCloneCommand,
+      push: pluginPushCommand,
+      pull: pluginPullCommand,
+      dev: pluginDevCommand,
+    },
+  },
+];
 
-theme
-  .command("list")
-  .description("List themes on the site")
-  .option("--site <url>", "Site URL")
-  .action(themeListCommand);
+for (const { kind, group, actions } of syncGroups) {
+  const cmd = program
+    .command(kind)
+    .description(`Sync ${group} with a Nodus Jet site (no SSH)${kind === "plugin" ? ". Never activates plugins" : ""}`);
 
-theme
-  .command("init")
-  .description("Create a new theme on the site and a local folder for it")
-  .requiredOption("--name <name>", "Theme name (slugified for the folder)")
-  .option("--site <url>", "Site URL")
-  .option("--dir <path>", "Local folder (default: ./<slug>)")
-  .action(themeInitCommand);
+  cmd
+    .command("list")
+    .description(`List ${kind}s on the site`)
+    .option("--site <url>", "Site URL")
+    .action(actions.list);
 
-theme
-  .command("clone <slug>")
-  .description("Download an existing CLI theme into a local folder")
-  .option("--site <url>", "Site URL")
-  .option("--dir <path>", "Local folder (default: ./<slug>)")
-  .action(themeCloneCommand);
+  cmd
+    .command("init")
+    .description(`Create a new ${kind} on the site and a local folder for it`)
+    .requiredOption("--name <name>", `${kind[0].toUpperCase()}${kind.slice(1)} name (slugified for the folder)`)
+    .option("--site <url>", "Site URL")
+    .option("--dir <path>", "Local folder (default: ./<slug>)")
+    .action(actions.init);
 
-theme
-  .command("push")
-  .description("Upload local changes to the site")
-  .option("--dir <path>", "Theme folder (default: current directory)")
-  .option("--delete", "Also delete files that only exist on the server")
-  .option("--dry-run", "Show what would change without sending anything")
-  .option("--force", "Overwrite even if the server changed since the last sync")
-  .action(themePushCommand);
+  cmd
+    .command("clone <slug>")
+    .description(`Download an existing CLI ${kind} into a local folder`)
+    .option("--site <url>", "Site URL")
+    .option("--dir <path>", "Local folder (default: ./<slug>)")
+    .action(actions.clone);
 
-theme
-  .command("pull")
-  .description("Download server changes")
-  .option("--dir <path>", "Theme folder (default: current directory)")
-  .option("--delete", "Also delete local files that no longer exist on the server")
-  .option("--dry-run", "Show what would change without writing anything")
-  .option("--force", "Overwrite local changes")
-  .action(themePullCommand);
+  cmd
+    .command("push")
+    .description("Upload local changes to the site")
+    .option("--dir <path>", `${kind[0].toUpperCase()}${kind.slice(1)} folder (default: current directory)`)
+    .option("--delete", "Also delete files that only exist on the server")
+    .option("--dry-run", "Show what would change without sending anything")
+    .option("--force", "Overwrite even if the server changed since the last sync")
+    .action(actions.push);
 
-theme
-  .command("dev")
-  .description("Watch the folder and push every change")
-  .option("--dir <path>", "Theme folder (default: current directory)")
-  .option("--delete", "Propagate local deletions to the server")
-  .option("--force", "Overwrite even if the server changed since the last sync")
-  .action(themeDevCommand);
+  cmd
+    .command("pull")
+    .description("Download server changes")
+    .option("--dir <path>", `${kind[0].toUpperCase()}${kind.slice(1)} folder (default: current directory)`)
+    .option("--delete", "Also delete local files that no longer exist on the server")
+    .option("--dry-run", "Show what would change without writing anything")
+    .option("--force", "Overwrite local changes")
+    .action(actions.pull);
+
+  cmd
+    .command("dev")
+    .description("Watch the folder and push every change")
+    .option("--dir <path>", `${kind[0].toUpperCase()}${kind.slice(1)} folder (default: current directory)`)
+    .option("--delete", "Propagate local deletions to the server")
+    .option("--force", "Overwrite even if the server changed since the last sync")
+    .action(actions.dev);
+}
 
 program.parse();

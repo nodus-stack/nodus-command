@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `noduscm theme push | pull` sync by manifest (only changed files), with `--dry-run`, `--delete` (deletions are opt-in) and `--force`. Push aborts if the server changed since the last sync; pull aborts if local edits would be overwritten.
   - `noduscm theme dev` watches the folder and pushes every change; prints the preview URL (`?nodus_jet_preview=<slug>`).
   - `.noduscmignore` (defaults: `node_modules/`, `.git/`, `*.map`, `.env`). Only whitelisted extensions are synced; dotfiles are never sent.
+- **Plugin sync (experiment):** `noduscm plugin list | init | clone | push | pull | dev`, same flow as themes against `/wp-json/nodus-jet/v1/plugins`. Files only: plugins are never activated, deactivated or previewed from the CLI (activate them in wp-admin). The folder context is stored in `.noduscm/plugin.json`; running `theme …` in a plugin folder (or vice versa) fails with a clear message. PHP syntax errors are rejected by the site with the file and line, and the whole batch is not written.
 - Dependency: `chokidar` (file watching).
 
 ## [1.3.0] - 2026-03-27

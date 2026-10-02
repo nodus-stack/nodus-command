@@ -4,7 +4,8 @@ import path from 'path';
 import { api } from './api.js';
 
 export const CONTEXT_DIR = '.noduscm';
-export const CONTEXT_FILE = 'theme.json';
+export const CONTEXT_FILES = { theme: 'theme.json', plugin: 'plugin.json' };
+export const CONTEXT_FILE = CONTEXT_FILES.theme;
 export const IGNORE_FILE = '.noduscmignore';
 
 // Deben coincidir con las reglas del servidor (CliSync en Nodus Jet).
@@ -23,18 +24,35 @@ const DEFAULT_IGNORE = ['node_modules/', '.git/', '.noduscm/', '*.map', '.env', 
 // Contexto local del tema (.noduscm/theme.json)
 // ---------------------------------------------------------------------------
 
+/**
+ * Tipo y slug del elemento sincronizado. Los contextos antiguos (solo temas)
+ * guardan `theme` en lugar de `kind` + `slug`.
+ */
+export function itemOf(ctx) {
+  const kind = ctx.kind === 'plugin' ? 'plugin' : 'theme';
+  return { kind, slug: ctx.slug || ctx.theme };
+}
+
+function apiBase(ctx) {
+  const { kind, slug } = itemOf(ctx);
+  return `/${kind}s/${slug}`;
+}
+
 export async function loadContext(dir) {
-  const file = path.join(dir, CONTEXT_DIR, CONTEXT_FILE);
-  if (!(await fs.pathExists(file))) {
-    throw new Error(
-      `No theme context in ${dir}. Run inside a folder created with "noduscm theme init" or "noduscm theme clone".`,
-    );
+  for (const kind of ['theme', 'plugin']) {
+    const file = path.join(dir, CONTEXT_DIR, CONTEXT_FILES[kind]);
+    if (await fs.pathExists(file)) {
+      const ctx = await fs.readJson(file);
+      return kind === 'plugin' ? { ...ctx, kind: 'plugin' } : ctx;
+    }
   }
-  return fs.readJson(file);
+  throw new Error(
+    `No theme/plugin context in ${dir}. Run inside a folder created with "noduscm theme|plugin init" or "clone".`,
+  );
 }
 
 export async function saveContext(dir, ctx) {
-  const file = path.join(dir, CONTEXT_DIR, CONTEXT_FILE);
+  const file = path.join(dir, CONTEXT_DIR, CONTEXT_FILES[itemOf(ctx).kind]);
   await fs.ensureDir(path.dirname(file));
   await fs.writeJson(file, ctx, { spaces: 2 });
 }
@@ -147,12 +165,12 @@ function chunk(items, size) {
 }
 
 async function fetchServerManifest(ctx, token) {
-  return api(ctx.site, 'GET', `/themes/${ctx.theme}/manifest`, { token });
+  return api(ctx.site, 'GET', `${apiBase(ctx)}/manifest`, { token });
 }
 
 export async function pushTheme(dir, ctx, token, { del = false, dryRun = false, force = false, onProgress = () => {} } = {}) {
   const { manifest: local, skipped } = await buildLocalManifest(dir);
-  const diff = await api(ctx.site, 'POST', `/themes/${ctx.theme}/manifest`, { token, body: { files: local } });
+  const diff = await api(ctx.site, 'POST', `${apiBase(ctx)}/manifest`, { token, body: { files: local } });
 
   if (ctx.lastSyncHash && diff.server_hash !== ctx.lastSyncHash && !force) {
     const err = new Error(
@@ -188,13 +206,13 @@ export async function pushTheme(dir, ctx, token, { del = false, dryRun = false, 
 
   let done = 0;
   for (const files of batches) {
-    const res = await api(ctx.site, 'PUT', `/themes/${ctx.theme}/files`, { token, body: { files, delete: [] } });
+    const res = await api(ctx.site, 'PUT', `${apiBase(ctx)}/files`, { token, body: { files, delete: [] } });
     summary.uploaded += res.written;
     done += files.length;
     onProgress(done, upload.length);
   }
   for (const paths of chunk(remove, BATCH_FILES)) {
-    const res = await api(ctx.site, 'PUT', `/themes/${ctx.theme}/files`, { token, body: { files: [], delete: paths } });
+    const res = await api(ctx.site, 'PUT', `${apiBase(ctx)}/files`, { token, body: { files: [], delete: paths } });
     summary.deleted += res.deleted;
   }
 
@@ -232,7 +250,7 @@ export async function pullTheme(dir, ctx, token, { del = false, dryRun = false, 
 
   let done = 0;
   for (const paths of chunk(download, 50)) {
-    const res = await api(ctx.site, 'POST', `/themes/${ctx.theme}/download`, { token, body: { paths } });
+    const res = await api(ctx.site, 'POST', `${apiBase(ctx)}/download`, { token, body: { paths } });
     for (const file of res.files) {
       if (!isSyncablePath(file.path)) continue; // nunca confiar en rutas del servidor
       const target = path.resolve(dir, file.path);

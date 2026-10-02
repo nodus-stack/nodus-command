@@ -46,6 +46,21 @@ Notes:
 - Ignore files with `.noduscmignore` (same idea as `.gitignore`, simple patterns).
 - This is a proof of concept: no live reload yet, and `theme publish` is not implemented.
 
+### Plugins (experiment)
+
+Same flow for plugin code. It only edits files: **plugins are never activated, deactivated or previewed** from the CLI.
+
+```bash
+noduscm plugin init --name "My Plugin"   # creates wp-content/plugins/my-plugin/my-plugin.php on the site + local folder
+cd my-plugin
+noduscm plugin dev                        # push on every save (or: plugin push / pull / clone / list)
+# then activate it once in wp-admin → Plugins
+```
+
+- Only plugins created with `plugin init` are writable. Existing plugins are never touched.
+- PHP files are syntax-checked by the site before writing; a syntax error rejects the whole push and prints the file and line. Runtime errors are not detected, so avoid editing a plugin that is active on a live site.
+- Needs a user with `install_plugins`; sites with `DISALLOW_FILE_MODS` refuse it.
+
 ## Requirements
 
 - Node.js 18+ 

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs-extra';
 import os from 'os';
 import path from 'path';
-import { buildLocalManifest, compileIgnore, isIgnored, isSyncablePath, sha1 } from '../src/lib/theme-sync.js';
+import { buildLocalManifest, compileIgnore, isIgnored, isSyncablePath, itemOf, loadContext, saveContext, sha1 } from '../src/lib/theme-sync.js';
 import { normalizeSite } from '../src/lib/auth.js';
 
 describe('isSyncablePath', () => {
@@ -71,5 +71,28 @@ describe('normalizeSite', () => {
 
   it('requires a value', () => {
     expect(() => normalizeSite('')).toThrow();
+  });
+});
+
+describe('theme / plugin context', () => {
+  it('itemOf keeps legacy theme contexts working', () => {
+    expect(itemOf({ site: 'https://a.com', theme: 'mi-tema' })).toEqual({ kind: 'theme', slug: 'mi-tema' });
+    expect(itemOf({ site: 'https://a.com', kind: 'plugin', slug: 'mi-plugin' })).toEqual({ kind: 'plugin', slug: 'mi-plugin' });
+  });
+
+  it('stores plugin context in plugin.json and theme context in theme.json', async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'nj-ctx-'));
+    const themeDir = path.join(tmp, 't');
+    const pluginDir = path.join(tmp, 'p');
+
+    await saveContext(themeDir, { site: 'https://a.com', theme: 'mi-tema' });
+    await saveContext(pluginDir, { site: 'https://a.com', kind: 'plugin', slug: 'mi-plugin' });
+
+    expect(await fs.pathExists(path.join(themeDir, '.noduscm', 'theme.json'))).toBe(true);
+    expect(await fs.pathExists(path.join(pluginDir, '.noduscm', 'plugin.json'))).toBe(true);
+    expect(itemOf(await loadContext(themeDir))).toEqual({ kind: 'theme', slug: 'mi-tema' });
+    expect(itemOf(await loadContext(pluginDir))).toEqual({ kind: 'plugin', slug: 'mi-plugin' });
+
+    await fs.remove(tmp);
   });
 });
