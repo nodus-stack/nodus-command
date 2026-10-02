@@ -6,12 +6,21 @@ import downCommand from "../src/commands/down.js";
 import generateCommand from "../src/commands/generate.js";
 import importDbCommand from "../src/commands/import-db.js";
 import infoCommand from "../src/commands/info.js";
+import { loginCommand, logoutCommand, whoamiCommand } from "../src/commands/login.js";
 import initCommand from "../src/commands/init.js";
 import pullCommand from "../src/commands/pull.js";
 import rebootstrapCommand from "../src/commands/rebootstrap.js";
 import removeCommand from "../src/commands/remove.js";
 import shellCommand from "../src/commands/shell.js";
 import upCommand from "../src/commands/up.js";
+import {
+  themeCloneCommand,
+  themeDevCommand,
+  themeInitCommand,
+  themeListCommand,
+  themePullCommand,
+  themePushCommand,
+} from "../src/commands/theme/index.js";
 import { showBanner, renderLogo } from "../src/ui/banner.js";
 
 const program = new Command();
@@ -134,5 +143,78 @@ program
   .description("Open a shell in the Apache container as webuser")
   .option("--root", "Connect as root instead of webuser")
   .action(shellCommand);
+
+// --- Nodus Jet: sync de temas por HTTPS (sin SSH) ---------------------------
+
+program
+  .command("login")
+  .description("Pair with a WordPress site running Nodus Jet")
+  .requiredOption("--site <url>", "Site URL, e.g. https://example.com")
+  .option("--code <code>", "One-time pairing code (prompted if omitted)")
+  .option("--label <label>", "Name for this session (default: hostname)")
+  .action(loginCommand);
+
+program
+  .command("logout")
+  .description("Revoke the session and remove the local token")
+  .option("--site <url>", "Site URL (optional if only one is logged in)")
+  .action(logoutCommand);
+
+program
+  .command("whoami")
+  .description("Show the current session for a site")
+  .option("--site <url>", "Site URL (optional if only one is logged in)")
+  .action(whoamiCommand);
+
+const theme = program
+  .command("theme")
+  .description("Sync WordPress themes with a Nodus Jet site (no SSH)");
+
+theme
+  .command("list")
+  .description("List themes on the site")
+  .option("--site <url>", "Site URL")
+  .action(themeListCommand);
+
+theme
+  .command("init")
+  .description("Create a new theme on the site and a local folder for it")
+  .requiredOption("--name <name>", "Theme name (slugified for the folder)")
+  .option("--site <url>", "Site URL")
+  .option("--dir <path>", "Local folder (default: ./<slug>)")
+  .action(themeInitCommand);
+
+theme
+  .command("clone <slug>")
+  .description("Download an existing CLI theme into a local folder")
+  .option("--site <url>", "Site URL")
+  .option("--dir <path>", "Local folder (default: ./<slug>)")
+  .action(themeCloneCommand);
+
+theme
+  .command("push")
+  .description("Upload local changes to the site")
+  .option("--dir <path>", "Theme folder (default: current directory)")
+  .option("--delete", "Also delete files that only exist on the server")
+  .option("--dry-run", "Show what would change without sending anything")
+  .option("--force", "Overwrite even if the server changed since the last sync")
+  .action(themePushCommand);
+
+theme
+  .command("pull")
+  .description("Download server changes")
+  .option("--dir <path>", "Theme folder (default: current directory)")
+  .option("--delete", "Also delete local files that no longer exist on the server")
+  .option("--dry-run", "Show what would change without writing anything")
+  .option("--force", "Overwrite local changes")
+  .action(themePullCommand);
+
+theme
+  .command("dev")
+  .description("Watch the folder and push every change")
+  .option("--dir <path>", "Theme folder (default: current directory)")
+  .option("--delete", "Propagate local deletions to the server")
+  .option("--force", "Overwrite even if the server changed since the last sync")
+  .action(themeDevCommand);
 
 program.parse();

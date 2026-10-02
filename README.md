@@ -19,6 +19,33 @@ Modern WordPress local development environment powered by Docker/Podman.
 🗄️ **Import DB** - Import any `.sql` backup directly into the local container
 ℹ️ **Project Info** - View all project details, URLs, and credentials at a glance
 
+## Theme sync over HTTPS (Nodus Jet)
+
+Develop a theme locally and sync it with a live site **without SSH/FTP**. The site needs the [Nodus Jet](https://github.com/nodus-stack/nodus-jet) plugin.
+
+```bash
+# 1. In wp-admin → Nodus Jet → CLI, generate a pairing code, then:
+noduscm login --site https://example.com
+
+# 2. Create a theme (local folder + theme on the site)
+noduscm theme init --name "My Theme"
+cd my-theme
+
+# 3. Work: push once, or watch and push on every save
+noduscm theme push            # --dry-run to preview, --delete to remove server-only files
+noduscm theme dev             # prints the preview URL (public link, shareable)
+
+# Other machine / get server changes
+noduscm theme clone my-theme --site https://example.com
+noduscm theme pull
+```
+
+Notes:
+- Only themes created with `theme init` are writable from the CLI. Other themes are never touched.
+- Sessions last 12 h of inactivity and can be revoked from wp-admin or with `noduscm logout`.
+- Ignore files with `.noduscmignore` (same idea as `.gitignore`, simple patterns).
+- This is a proof of concept: no live reload yet, and `theme publish` is not implemented.
+
 ## Requirements
 
 - Node.js 18+ 
