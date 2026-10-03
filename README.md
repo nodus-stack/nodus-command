@@ -35,13 +35,15 @@ cd my-theme
 noduscm theme push            # lists every file it uploads; --dry-run to preview, --delete to remove server-only files
 noduscm theme dev             # prints the preview URL (public link, shareable)
 
-# Other machine / get server changes
-noduscm theme clone my-theme --site https://example.com
-noduscm theme pull
+# Other machine / get an item you don't have locally
+noduscm theme clone my-theme --site https://example.com   # downloads it into ./my-theme (creates the context)
+cd my-theme
+noduscm theme pull                                        # pull/push/dev only run inside a folder with context
 ```
 
 Notes:
-- Only themes created with `theme init` are writable from the CLI. Other themes are never touched.
+- `list` runs anywhere; `push`, `pull` and `dev` only run inside a folder created by `init` or `clone` (context in `.noduscm/<kind>.json`, which also supplies the site — they take no `--site`). Anywhere else they exit 40 with `No … context in <dir>…`. There is no way to pull an item you have never cloned or initialised here: `clone` is that step.
+- Any installed theme is readable and writable from the CLI (the `cli` badge only marks items created with noduscm). Writing themes needs a user with `edit_themes` and `DISALLOW_FILE_MODS` off.
 - Sessions last 12 h of inactivity and can be revoked from wp-admin or with `noduscm logout`.
 - Ignore files with `.noduscmignore` (same idea as `.gitignore`, simple patterns).
 - Everything a project needs is synced (php, js/jsx/ts/tsx, css/scss, vue, json, lock files, yml, images, fonts, media…). Never synced: hidden files (`.env`, `.htaccess`, `.eslintrc`…), `phar/phtml/php3-8/exe/dll/so/dylib/msi` and `web.config`. Max 16 MB per file. Anything skipped is listed with a `⚠ skipped` notice and the reason; use `.noduscmignore` for what you don't want (e.g. `vendor/`).
@@ -58,9 +60,28 @@ noduscm plugin dev                        # push on every save (or: plugin push 
 # then activate it once in wp-admin → Plugins
 ```
 
-- Only plugins created with `plugin init` are writable. Existing plugins are never touched.
+- Any installed plugin is readable and writable from the CLI (the `cli` badge only marks items created with noduscm).
 - PHP files are syntax-checked by the site before writing; a syntax error rejects the whole push and prints the file and line. Runtime errors are not detected, so avoid editing a plugin that is active on a live site.
 - Needs a user with `install_plugins`; sites with `DISALLOW_FILE_MODS` refuse it.
+
+### Mu-plugins
+
+Same flow again, for must-use plugins:
+
+```bash
+noduscm mu-plugin init --name "My MU"     # creates wp-content/mu-plugins/my-mu.php on the site + local folder
+cd my-mu
+noduscm mu-plugin dev                     # push on every save (or: push / pull / clone / list)
+```
+
+- The site creates a **single file** `wp-content/mu-plugins/<slug>.php` with a `Plugin Name`
+  header. WordPress loads mu-plugins automatically: there is nothing to activate and no preview.
+- Folder context lives in `.noduscm/mu-plugin.json`; running `theme …` or `plugin …` in a
+  mu-plugin folder (or the reverse) fails with a clear message.
+- The mu-plugins folder is shared by every mu-plugin, so the CLI only ever reads or writes
+  `<slug>.php` and `<slug>/**`; anything else there is never listed nor modified.
+- Permissions are the same as for plugins: a user with `install_plugins` and
+  `DISALLOW_FILE_MODS` off. mu-plugins are never activated or deactivated from the CLI.
 
 ## Requirements
 
