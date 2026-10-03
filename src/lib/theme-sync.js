@@ -4,7 +4,7 @@ import path from 'path';
 import { api } from './api.js';
 
 export const CONTEXT_DIR = '.noduscm';
-export const CONTEXT_FILES = { theme: 'theme.json', plugin: 'plugin.json' };
+export const CONTEXT_FILES = { theme: 'theme.json', plugin: 'plugin.json', 'mu-plugin': 'mu-plugin.json' };
 export const CONTEXT_FILE = CONTEXT_FILES.theme;
 export const IGNORE_FILE = '.noduscmignore';
 
@@ -30,7 +30,7 @@ const DEFAULT_IGNORE = ['node_modules/', '.git/', '.noduscm/', '.noduscmignore',
  * guardan `theme` en lugar de `kind` + `slug`.
  */
 export function itemOf(ctx) {
-  const kind = ctx.kind === 'plugin' ? 'plugin' : 'theme';
+  const kind = ctx.kind === 'plugin' || ctx.kind === 'mu-plugin' ? ctx.kind : 'theme';
   return { kind, slug: ctx.slug || ctx.theme };
 }
 
@@ -40,16 +40,18 @@ function apiBase(ctx) {
 }
 
 export async function loadContext(dir) {
-  for (const kind of ['theme', 'plugin']) {
+  for (const kind of ['theme', 'plugin', 'mu-plugin']) {
     const file = path.join(dir, CONTEXT_DIR, CONTEXT_FILES[kind]);
     if (await fs.pathExists(file)) {
       const ctx = await fs.readJson(file);
-      return kind === 'plugin' ? { ...ctx, kind: 'plugin' } : ctx;
+      return { ...ctx, kind };
     }
   }
-  throw new Error(
-    `No theme/plugin context in ${dir}. Run inside a folder created with "noduscm theme|plugin init" or "clone".`,
+  const err = new Error(
+    `No theme/plugin/mu-plugin context in ${dir}. Run inside a folder created with "noduscm theme|plugin|mu-plugin init" or "clone".`,
   );
+  err.code = 'context_missing';
+  throw err;
 }
 
 export async function saveContext(dir, ctx) {
@@ -252,7 +254,13 @@ export async function pullTheme(dir, ctx, token, { del = false, dryRun = false, 
     throw err;
   }
 
-  const summary = { download, remove, downloaded: 0, deleted: 0 };
+  const summary = {
+    download,
+    remove,
+    downloaded: 0,
+    deleted: 0,
+    unchanged: Object.keys(local).filter((rel) => server.files[rel] === local[rel]).length,
+  };
   if (dryRun) return summary;
 
   if (download.length || remove.length) onPlan(summary);

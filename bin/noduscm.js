@@ -6,7 +6,12 @@ import downCommand from "../src/commands/down.js";
 import generateCommand from "../src/commands/generate.js";
 import importDbCommand from "../src/commands/import-db.js";
 import infoCommand from "../src/commands/info.js";
-import { loginCommand, logoutCommand, whoamiCommand } from "../src/commands/login.js";
+import {
+  loginCommand,
+  logoutCommand,
+  sitesCommand,
+  whoamiCommand,
+} from "../src/commands/login.js";
 import initCommand from "../src/commands/init.js";
 import pullCommand from "../src/commands/pull.js";
 import rebootstrapCommand from "../src/commands/rebootstrap.js";
@@ -29,7 +34,16 @@ import {
   pluginPullCommand,
   pluginPushCommand,
 } from "../src/commands/plugin/index.js";
+import {
+  muPluginCloneCommand,
+  muPluginDevCommand,
+  muPluginInitCommand,
+  muPluginListCommand,
+  muPluginPullCommand,
+  muPluginPushCommand,
+} from "../src/commands/mu-plugin/index.js";
 import { showBanner, renderLogo } from "../src/ui/banner.js";
+import { emitJson, isJsonMode } from "../src/lib/output.js";
 
 const program = new Command();
 
@@ -37,12 +51,23 @@ program
   .name("noduscm")
   .description("Modern WordPress local development environment")
   .version("1.3.1")
-  .addHelpText("beforeAll", () => "\n" + renderLogo() + "\n")
+  .option(
+    "--format <format>",
+    "Output format for GUI/automation: json (single envelope for instant commands, NDJSON for long ones)",
+  )
+  .option("--json", "Shorthand for --format=json")
+  .addHelpText("beforeAll", () => (isJsonMode() ? "" : "\n" + renderLogo() + "\n"))
   .hook("preAction", (thisCommand) => {
-    if (thisCommand.args.length === 0) {
+    // Banner solo en texto: en modo json stdout lleva únicamente JSON (SDD-001 §3.2).
+    if (!isJsonMode() && thisCommand.args.length === 0) {
       showBanner();
     }
   });
+
+// Los errores de commander (opción faltante/desconocida, etc.) se traducen a un
+// envelope con exit 50 en modo json (spec §3.4). Debe registrarse ANTES de crear
+// subcomandos: commander copia el callback a cada hijo.
+program.exitOverride();
 
 program
   .command("init")
@@ -174,6 +199,11 @@ program
   .option("--site <url>", "Site URL (optional if only one is logged in)")
   .action(whoamiCommand);
 
+program
+  .command("sites")
+  .description("List locally saved site sessions (auth.json, no network)")
+  .action(sitesCommand);
+
 const syncGroups = [
   {
     kind: "theme",
@@ -199,12 +229,31 @@ const syncGroups = [
       dev: pluginDevCommand,
     },
   },
+  {
+    kind: "mu-plugin",
+    group: "WordPress mu-plugins (must-use)",
+    actions: {
+      list: muPluginListCommand,
+      init: muPluginInitCommand,
+      clone: muPluginCloneCommand,
+      push: muPluginPushCommand,
+      pull: muPluginPullCommand,
+      dev: muPluginDevCommand,
+    },
+  },
 ];
+
+const kindHint = (kind) =>
+  kind === "plugin"
+    ? ". Never activates plugins"
+    : kind === "mu-plugin"
+      ? ". Created as a single file in wp-content/mu-plugins (WordPress loads it, no activation)"
+      : "";
 
 for (const { kind, group, actions } of syncGroups) {
   const cmd = program
     .command(kind)
-    .description(`Sync ${group} with a Nodus Jet site (no SSH)${kind === "plugin" ? ". Never activates plugins" : ""}`);
+    .description(`Sync ${group} with a Nodus Jet site (no SSH)${kindHint(kind)}`);
 
   cmd
     .command("list")
@@ -230,6 +279,8 @@ for (const { kind, group, actions } of syncGroups) {
   cmd
     .command("push")
     .description("Upload local changes to the site")
+    .option("--site <url>", "Site URL (checked against the folder context)")
+    .option("--slug <slug>", "Expected item slug (checked against the folder context)")
     .option("--dir <path>", `${kind[0].toUpperCase()}${kind.slice(1)} folder (default: current directory)`)
     .option("--delete", "Also delete files that only exist on the server")
     .option("--dry-run", "Show what would change without sending anything")
@@ -239,6 +290,8 @@ for (const { kind, group, actions } of syncGroups) {
   cmd
     .command("pull")
     .description("Download server changes")
+    .option("--site <url>", "Site URL (checked against the folder context)")
+    .option("--slug <slug>", "Expected item slug (checked against the folder context)")
     .option("--dir <path>", `${kind[0].toUpperCase()}${kind.slice(1)} folder (default: current directory)`)
     .option("--delete", "Also delete local files that no longer exist on the server")
     .option("--dry-run", "Show what would change without writing anything")
@@ -248,10 +301,33 @@ for (const { kind, group, actions } of syncGroups) {
   cmd
     .command("dev")
     .description("Watch the folder and push every change")
+    .option("--site <url>", "Site URL (checked against the folder context)")
+    .option("--slug <slug>", "Expected item slug (checked against the folder context)")
     .option("--dir <path>", `${kind[0].toUpperCase()}${kind.slice(1)} folder (default: current directory)`)
     .option("--delete", "Propagate local deletions to the server")
     .option("--force", "Overwrite even if the server changed since the last sync")
     .action(actions.dev);
 }
 
-program.parse();
+try {
+  program.parse();
+} catch (err) {
+  // Con exitOverride, commander lanza en vez de process.exit (la fwrite del
+  // mensaje ya se hizo a stderr). En modo json devolvemos envelope + exit 50
+  // para errores de validación de argumentos (spec §3.4); en texto salimos con
+  // el mismo código que hasta hoy.
+  if (!err || typeof err.code !== "string" || !err.code.startsWith("commander.")) throw err;
+  const exitCode = typeof err.exitCode === "number" ? err.exitCode : 1;
+  if (isJsonMode() && exitCode !== 0) {
+    emitJson({
+      ok: false,
+      code: 50,
+      data: null,
+      error: err.code,
+      message: err.code === "commander.help" ? "No command specified" : err.message,
+    });
+    process.exitCode = 50;
+  } else {
+    process.exitCode = exitCode;
+  }
+}

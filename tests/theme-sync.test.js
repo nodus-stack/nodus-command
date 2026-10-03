@@ -90,6 +90,7 @@ describe('theme / plugin context', () => {
   it('itemOf keeps legacy theme contexts working', () => {
     expect(itemOf({ site: 'https://a.com', theme: 'mi-tema' })).toEqual({ kind: 'theme', slug: 'mi-tema' });
     expect(itemOf({ site: 'https://a.com', kind: 'plugin', slug: 'mi-plugin' })).toEqual({ kind: 'plugin', slug: 'mi-plugin' });
+    expect(itemOf({ site: 'https://a.com', kind: 'mu-plugin', slug: 'mi-mu' })).toEqual({ kind: 'mu-plugin', slug: 'mi-mu' });
   });
 
   it('stores plugin context in plugin.json and theme context in theme.json', async () => {
@@ -104,6 +105,26 @@ describe('theme / plugin context', () => {
     expect(await fs.pathExists(path.join(pluginDir, '.noduscm', 'plugin.json'))).toBe(true);
     expect(itemOf(await loadContext(themeDir))).toEqual({ kind: 'theme', slug: 'mi-tema' });
     expect(itemOf(await loadContext(pluginDir))).toEqual({ kind: 'plugin', slug: 'mi-plugin' });
+
+    await fs.remove(tmp);
+  });
+
+  it('stores mu-plugin context in mu-plugin.json and loads it back', async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'nj-ctx-'));
+    const muDir = path.join(tmp, 'mu');
+
+    await saveContext(muDir, { site: 'https://a.com', kind: 'mu-plugin', slug: 'mi-mu' });
+
+    expect(await fs.pathExists(path.join(muDir, '.noduscm', 'mu-plugin.json'))).toBe(true);
+    expect(itemOf(await loadContext(muDir))).toEqual({ kind: 'mu-plugin', slug: 'mi-mu' });
+
+    await fs.remove(tmp);
+  });
+
+  it('loadContext reports context_missing outside a sync folder', async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'nj-ctx-'));
+
+    await expect(loadContext(tmp)).rejects.toMatchObject({ code: 'context_missing' });
 
     await fs.remove(tmp);
   });

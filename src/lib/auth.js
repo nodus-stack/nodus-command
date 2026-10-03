@@ -15,9 +15,20 @@ export function authFilePath() {
 
 export function normalizeSite(input) {
   let value = String(input || '').trim();
-  if (!value) throw new Error('Site URL is required (e.g. --site https://example.com)');
+  if (!value) {
+    const err = new Error('Site URL is required (e.g. --site https://example.com)');
+    err.code = 'validation';
+    throw err;
+  }
   if (!/^https?:\/\//i.test(value)) value = `https://${value}`;
-  const url = new URL(value);
+  let url;
+  try {
+    url = new URL(value);
+  } catch (cause) {
+    const err = new Error(cause.message);
+    err.code = 'validation';
+    throw err;
+  }
   return url.origin + url.pathname.replace(/\/+$/, '');
 }
 
@@ -57,18 +68,42 @@ export async function listSites() {
 }
 
 /**
+ * Sesiones guardadas completas (para `noduscm sites`). 100% local, sin red.
+ * Nunca incluye el token: solo `has_token`.
+ */
+export async function listSiteSessions() {
+  const { sites } = await readAll();
+  return Object.entries(sites).map(([site, entry]) => ({
+    site,
+    label: entry.label ?? null,
+    saved_at: entry.savedAt ?? null,
+    has_token: Boolean(entry.token),
+  }));
+}
+
+/**
  * Resuelve el sitio: --site, o el único sitio con sesión guardada.
  */
 export async function resolveSite(explicit) {
   if (explicit) return normalizeSite(explicit);
   const sites = await listSites();
   if (sites.length === 1) return sites[0];
-  if (sites.length === 0) throw new Error('Not logged in. Run: noduscm login --site <url>');
-  throw new Error(`Multiple sites logged in; pass --site. (${sites.join(', ')})`);
+  if (sites.length === 0) {
+    const err = new Error('Not logged in. Run: noduscm login --site <url>');
+    err.code = 'not_authenticated';
+    throw err;
+  }
+  const err = new Error(`Multiple sites logged in; pass --site. (${sites.join(', ')})`);
+  err.code = 'validation';
+  throw err;
 }
 
 export async function requireToken(site) {
   const auth = await loadAuth(site);
-  if (!auth?.token) throw new Error(`Not logged in to ${site}. Run: noduscm login --site ${site}`);
+  if (!auth?.token) {
+    const err = new Error(`Not logged in to ${site}. Run: noduscm login --site ${site}`);
+    err.code = 'not_authenticated';
+    throw err;
+  }
   return auth.token;
 }
