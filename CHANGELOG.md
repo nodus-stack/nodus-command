@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-10-16
+
+### Added
+- `noduscm mcp`: local MCP server for AI agents (Claude Code, Claude Desktop, your own UI).
+  - Transports: stdio by default; `--http [port]` serves on 127.0.0.1 with a Bearer token, a Host check and an optional `--cors` origin.
+  - Tools: projects, info/status, up/down, logs, WP-CLI, pull, backups (create/list/restore), import-db, generate, rebootstrap and remove. `container_exec` is only available with `--allow-exec`.
+  - Destructive tools require `confirm = <slug>`, and `project_info` never returns passwords.
+- Project registry at `~/.config/noduscm/projects.json`, updated by `init` and `up`. Use `--root` to discover projects in folders.
+- Non-interactive mode (`NODUSCM_NON_INTERACTIVE=1`, used by the MCP server):
+  - The hosts file and `mkcert -install` steps are skipped with a warning instead of prompting for sudo.
+  - New `noduscm remove --yes` flag.
+
+### Fixed
+- `noduscm backup` crashed because `containerExec` did not return the command output.
+- `noduscm down` uses the project's compose file and exits with code 1 on failure.
+- `--version` now reads the version from `package.json`.
+
 ## [1.3.0] - 2026-03-27
 
 ### Added

@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "fs";
 import { Command } from "commander";
 import backupCommand from "../src/commands/backup.js";
 import downCommand from "../src/commands/down.js";
 import generateCommand from "../src/commands/generate.js";
 import importDbCommand from "../src/commands/import-db.js";
 import infoCommand from "../src/commands/info.js";
+import mcpCommand from "../src/commands/mcp.js";
 import initCommand from "../src/commands/init.js";
 import pullCommand from "../src/commands/pull.js";
 import rebootstrapCommand from "../src/commands/rebootstrap.js";
@@ -19,7 +21,7 @@ const program = new Command();
 program
   .name("noduscm")
   .description("Modern WordPress local development environment")
-  .version("1.3.1")
+  .version(JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version)
   .addHelpText("beforeAll", () => "\n" + renderLogo() + "\n")
   .hook("preAction", (thisCommand) => {
     if (thisCommand.args.length === 0) {
@@ -53,6 +55,7 @@ program
 program
   .command("remove")
   .description("Remove the WordPress project completely")
+  .option("--yes", "Skip the confirmation prompt")
   .action(removeCommand);
 
 program
@@ -134,5 +137,25 @@ program
   .description("Open a shell in the Apache container as webuser")
   .option("--root", "Connect as root instead of webuser")
   .action(shellCommand);
+
+program
+  .command("mcp")
+  .description("Run a local MCP server so AI agents can manage your projects")
+  .option("--http [port]", "Serve over HTTP on 127.0.0.1 (default port 7337) instead of stdio")
+  .option("--token <token>", "Bearer token for --http (default: NODUSCM_MCP_TOKEN or a random one)")
+  .option(
+    "--root <dir>",
+    "Also discover projects under this folder (repeatable)",
+    (value, previous = []) => [...previous, value],
+    [],
+  )
+  .option(
+    "--cors <origin>",
+    "Allow a browser origin to call the --http server, e.g. http://localhost:5173 (repeatable)",
+    (value, previous = []) => [...previous, value],
+    [],
+  )
+  .option("--allow-exec", "Enable container_exec and wp shell/eval-file (arbitrary commands)")
+  .action(mcpCommand);
 
 program.parse();

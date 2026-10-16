@@ -8,6 +8,7 @@ import pullCommand from './pull.js';
 import { getLocalSiteUrl } from '../lib/wordpress.js';
 import { ensureDomainInHosts, getHostsFilePathForCurrentOs } from '../lib/hosts.js';
 import { ensureLocalHttpsCertificate } from '../lib/certs.js';
+import { registerProject } from '../lib/registry.js';
 
 function shellEscape(value) {
   return `'${String(value ?? '').replace(/'/g, `'"'"'`)}'`;
@@ -55,6 +56,9 @@ export default async function upCommand() {
 
       if (hostsResult.changed) {
         spinner.succeed(chalk.green(`Hosts entry added for ${config.domain}`));
+        spinner.start('Starting NodusCommand...');
+      } else if (hostsResult.reason === 'non-interactive') {
+        spinner.warn(chalk.yellow(`Hosts entry for ${config.domain} not checked/added (non-interactive). If it does not resolve, add "127.0.0.1 ${config.domain}" to ${getHostsFilePathForCurrentOs()}`));
         spinner.start('Starting NodusCommand...');
       } else if (hostsResult.reason === 'user-declined') {
         spinner.warn(chalk.yellow(`Hosts entry skipped. If ${config.domain} does not resolve, add it to ${getHostsFilePathForCurrentOs()}`));
@@ -166,6 +170,8 @@ export default async function upCommand() {
       }
     }
     
+    await registerProject(process.cwd(), config);
+
     spinner.succeed(chalk.green('NodusCommand is running!'));
     
     // Show URLs

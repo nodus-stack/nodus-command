@@ -193,3 +193,11 @@ noduscm remove
 ```
 
 Elimina contenedores, volúmenes y archivos generados de NodusCommand, pero conserva `wordpress/` y `wp-content/`.
+
+## 10) Agentes IA (MCP) / AI agents (MCP)
+
+```bash
+claude mcp add noduscm -- noduscm mcp --root ~/WorkspacePHP
+NODUSCM_MCP_TOKEN=token noduscm mcp --http 7337
+```
+

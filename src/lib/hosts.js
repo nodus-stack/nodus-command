@@ -2,6 +2,7 @@ import fs from 'fs-extra';
 import dns from 'dns';
 import inquirer from 'inquirer';
 import { execa } from 'execa';
+import { isInteractive } from './interactive.js';
 
 const LOOPBACKS = new Set(['127.0.0.1', '::1']);
 
@@ -83,6 +84,11 @@ export async function ensureDomainInHosts(domain, options = {}) {
   const dnsLoopback = await resolvesToLoopback(normalizedDomain);
   if (dnsLoopback) {
     return { changed: false, skipped: true, reason: 'dns-loopback' };
+  }
+
+  // Sin terminal (agentes/MCP) no se puede pedir sudo: se omite y se avisa.
+  if (!isInteractive()) {
+    return { changed: false, skipped: true, reason: 'non-interactive' };
   }
 
   if (options.prompt !== false) {

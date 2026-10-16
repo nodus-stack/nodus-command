@@ -6,6 +6,7 @@ import { promptProjectInit } from '../ui/prompts.js';
 import { showLogo } from '../ui/banner.js';
 import { detectContainerEngine } from '../lib/container.js';
 import { saveConfig, projectExists, getProjectPaths } from '../lib/config.js';
+import { registerProject } from '../lib/registry.js';
 import { downloadWordPress, generateWpConfig, getLocalSiteUrl } from '../lib/wordpress.js';
 import { generateDockerCompose, generateApacheConfig, generateDockerfile, generatePhpIni, DEFAULT_PHP_INI } from '../lib/templates.js';
 import { testSSHConnection } from '../lib/ssh.js';
@@ -132,6 +133,7 @@ export default async function initCommand(options = {}) {
     };
 
     await saveConfig(projectPath, fullConfig);
+    await registerProject(projectPath, fullConfig);
 
     spinner.text = 'Generating php.ini...';
     await generatePhpIni(fullConfig, projectPath);

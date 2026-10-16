@@ -1,5 +1,5 @@
-import { execa } from 'execa';
 import { getProjectPaths, loadConfig } from '../lib/config.js';
+import { containerDown } from '../lib/container.js';
 import chalk from 'chalk';
 
 export default async function downCommand() {
@@ -8,13 +8,11 @@ export default async function downCommand() {
     const config = await loadConfig(projectPath);
     const paths = getProjectPaths(projectPath);
 
-    await execa(config.engine, ['compose', 'down'], {
-      cwd: paths.projectRoot,
-      stdio: 'inherit'
-    });
+    await containerDown(config.engine, paths.dockerCompose);
 
     console.log(chalk.green('\n✅ Project stopped successfully\n'));
   } catch (error) {
     console.log(chalk.red(`\n❌ Error: ${error.message}\n`));
+    process.exit(1);
   }
 }

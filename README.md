@@ -18,6 +18,7 @@ Modern WordPress local development environment powered by Docker/Podman.
 👤 **cPanel-style user** - Apache container runs as `webuser` (non-root), full sudo available
 🗄️ **Import DB** - Import any `.sql` backup directly into the local container
 ℹ️ **Project Info** - View all project details, URLs, and credentials at a glance
+🤖 **AI agents (MCP)** - `noduscm mcp` lets Claude Code, Claude Desktop or your own agent UI manage local projects
 
 ## Requirements
 
@@ -237,6 +238,19 @@ wp plugin list         # WP-CLI without sudo
 wp cache flush
 sudo service apache2 restart  # admin commands via sudo (password: webuser)
 ```
+
+### `noduscm mcp`
+Run a local MCP server so AI agents can list, start and stop projects and run WP-CLI. They can also pull from production, take and restore backups, import SQL files and read logs.
+
+```bash
+# Claude Code
+claude mcp add noduscm -- noduscm mcp --root ~/WorkspacePHP
+
+# Your own agent UI over local HTTP (127.0.0.1 + Bearer token)
+NODUSCM_MCP_TOKEN=a-long-token noduscm mcp --http 7337 --cors http://localhost:5173
+```
+
+Commands run non-interactively: nothing asks for passwords or sudo. Destructive tools require `confirm = <project slug>`. See [`examples/13-mcp.en.md`](examples/13-mcp.en.md).
 
 ## Configuration
 
