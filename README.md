@@ -113,11 +113,19 @@ Initialize a new WordPress project with interactive prompts.
 - Local or remote database
 - SSH configuration for remote sync
 - `--mount <entry>` Add custom bind mount entry (repeatable)
+- `--yes` Non-interactive (scripts and agents): everything comes from flags, local database, no SSH.
+  `--name` (required), `--domain`, `--wp-version`, `--existing`, `--db-name`, `--db-user`, `--db-password`,
+  `--http-port`, `--mysql-port`, `--https`, `--https-port`, `--no-hosts`, `--mount`.
 
 **Examples:**
 ```bash
 # Fully interactive init
 noduscm init
+
+# Non-interactive (same defaults as the prompts)
+mkdir ~/WorkspacePHP/mi-tienda && cd ~/WorkspacePHP/mi-tienda
+noduscm init --yes --name "Mi Tienda" --wp-version 6.8.1 --http-port 8081 --mysql-port 3307 \
+  --mount ~/WorkspacePHP/nodus-apex:/var/www/html/wp-content/themes/nodus-apex
 
 # Init with predefined local repo mounts (no mount prompt)
 noduscm init \

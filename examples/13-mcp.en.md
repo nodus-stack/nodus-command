@@ -52,6 +52,7 @@ NODUSCM_MCP_TOKEN=a-long-token noduscm mcp --http 7337 --cors http://localhost:5
 | Tool | What it does |
 | --- | --- |
 | `list_projects`, `register_project` | Projects on this machine |
+| `project_init` | `noduscm init --yes`: new project in `<root>/<slug>` (local DB, no SSH), free ports picked automatically, theme/plugin folders mounted from inside a `--root` |
 | `project_info`, `project_status` | Config without passwords, URLs, containers |
 | `project_up`, `project_down` | `noduscm up` / `down` |
 | `project_logs` | Apache (PHP errors) or MySQL logs |
@@ -68,6 +69,7 @@ NODUSCM_MCP_TOKEN=a-long-token noduscm mcp --http 7337 --cors http://localhost:5
 - **No passwords or sudo prompts.** The server runs commands with `NODUSCM_NON_INTERACTIVE=1`. If editing `/etc/hosts` or running `mkcert -install` is needed, the output says so and you have to do it once from your terminal.
 - **Confirmation.** Anything that deletes or replaces local data requires `confirm = <project slug>`: pulling the DB, restoring a backup, `import_db` with `force`, `rebootstrap --force` and `remove`.
 - **Passwords.** `project_info` never returns the DB or SSH passwords.
+- **`project_init` stays inside `--root`.** The project folder and every mounted folder must be inside a `--root` (symlinks are resolved first), and mounts can only target `wp-content/themes|plugins|mu-plugins/<name>`. Without `--root` the tool is disabled.
 
 ## Cloud connector: `noduscm connect`
 

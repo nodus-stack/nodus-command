@@ -3,6 +3,7 @@ import ora from 'ora';
 import path from 'path';
 import fs from 'fs-extra';
 import { promptProjectInit } from '../ui/prompts.js';
+import { buildInitConfig } from '../lib/init-options.js';
 import { showLogo } from '../ui/banner.js';
 import { detectContainerEngine } from '../lib/container.js';
 import { saveConfig, projectExists, getProjectPaths } from '../lib/config.js';
@@ -28,20 +29,24 @@ async function ensureWpContentStructure(wpContentPath) {
 
 export default async function initCommand(options = {}) {
   try {
-    showLogo();
+    if (!options.yes) showLogo();
 
     // Check if project already exists
     if (await projectExists()) {
+      if (options.yes) throw new Error('A NodusCommand project already exists in this directory');
       console.log(chalk.red('\n  ❌ NodusCommand project already exists in this directory'));
       console.log(chalk.yellow('  Run this command in a new directory or remove the existing project first\n'));
       return;
     }
 
+    // --yes: todo sale de los flags (validados) y nada pregunta
+    const presetConfig = options.yes ? await buildInitConfig(options, process.cwd()) : null;
+
     // Detect container engine
     const engine = await detectContainerEngine();
 
     // Get project configuration
-    const config = await promptProjectInit({
+    const config = presetConfig || await promptProjectInit({
       mounts: options.mount || []
     });
 

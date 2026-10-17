@@ -10,10 +10,12 @@ import { registerProject, scanForProjects } from '../lib/registry.js';
 import { ToolError, listProjects, projectStatus, redactConfig, resolveProject, siteUrl } from './projects.js';
 import { containerLogs, runCli, runInContainer, runWpCli } from './runner.js';
 import { projectRepos, publish, repoStatus, resolveRepo } from './git.js';
+import { initArgs, prepareInit } from './init.js';
 
 const VERSION = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version;
 
 const INSTRUCTIONS = `NodusCommand (noduscm): entornos WordPress locales en Docker/Podman en este equipo.
+0. Proyecto nuevo: project_init (crea la carpeta bajo un --root, descarga WordPress y monta tus temas/plugins) → project_up → wp_cli ["core","install",…] → wp_cli ["plugin","install",…,"--activate"].
 1. list_projects → elige el proyecto (slug). Si falta, register_project con su carpeta.
 2. project_status / project_info antes de actuar; project_up para arrancarlo.
 3. WP-CLI dentro del contenedor con wp_cli (args sin "wp", p. ej. ["plugin","list","--format=json"]).
@@ -89,6 +91,47 @@ export function buildServer({ roots = [], allowExec = false } = {}) {
       if (!found.length) throw new ToolError(`No .noduscm.json found in ${dir} (2 levels deep).`);
       for (const root of found) await registerProject(root);
       return text({ registered: found });
+    })
+  );
+
+  server.registerTool(
+    'project_init',
+    {
+      title: 'Crear proyecto',
+      description:
+        'noduscm init --yes: crea un proyecto WordPress nuevo (BD local, sin SSH) en <parent>/<slug>, dentro de una carpeta --root del servidor. ' +
+        'Descarga el core, genera Docker/Apache/wp-config y lo registra; no lo arranca (luego project_up). ' +
+        'mounts monta carpetas locales (dentro de un --root) en wp-content, p. ej. {source: "/ruta/al/tema", target: "themes/mi-tema"}. ' +
+        'Si no pasas puertos, usa los primeros libres entre tus proyectos.',
+      inputSchema: {
+        name: z.string().describe('Nombre del proyecto (el slug y el dominio salen de aquí)'),
+        parent: z.string().optional().describe('Carpeta absoluta donde crearlo (dentro de un --root). Por defecto, el primer --root'),
+        domain: z.string().optional().describe('Dominio local terminado en .localhost (por defecto <slug>.localhost)'),
+        wp_version: z.string().optional().describe('Versión de WordPress, p. ej. 6.7 o 6.8.1 (por defecto 6.7)'),
+        mounts: z
+          .array(z.object({ source: z.string(), target: z.string(), read_only: z.boolean().optional() }))
+          .max(10)
+          .optional()
+          .describe('Carpetas a montar: source absoluta dentro de un --root; target "themes/<n>", "plugins/<n>" o "mu-plugins/<n>"'),
+        http_port: z.number().int().optional(),
+        mysql_port: z.number().int().optional(),
+        https: z.boolean().optional().describe('HTTPS local con certificado autofirmado'),
+        https_port: z.number().int().optional(),
+      },
+      annotations: rw,
+    },
+    safe(async (input) => {
+      const plan = await prepareInit(input, roots);
+      const result = await runCli(plan.dir, initArgs(plan), { timeoutMs: 10 * 60 * 1000 });
+      if (!result.ok) {
+        await plan.cleanup();
+        return cliResult(`noduscm init --yes (${plan.slug})`, result);
+      }
+      const summary =
+        `noduscm init --yes (${plan.slug}): OK → ${plan.dir}\n` +
+        `Siguiente: project_up "${plan.slug}", luego wp_cli ["core","install","--url=<url>","--title=…","--admin_user=…","--admin_email=…","--skip-email"].\n\n` +
+        (result.output || '');
+      return { ...text({ ...result, project: plan.slug, path: plan.dir, ports: plan.ports }, summary) };
     })
   );
 

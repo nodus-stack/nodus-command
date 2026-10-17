@@ -24,6 +24,11 @@ export async function downloadWordPress(version, destPath) {
     // Download
     await new Promise((resolve, reject) => {
       https.get(wpUrl, (response) => {
+        if (response.statusCode !== 200) {
+          response.resume();
+          reject(new Error(`WordPress ${version} not found (HTTP ${response.statusCode} from ${wpUrl})`));
+          return;
+        }
         const fileStream = createWriteStream(tmpFile);
         response.pipe(fileStream);
         fileStream.on('finish', () => {
@@ -100,7 +105,7 @@ export async function generateWpConfig(dbConfig, projectName, localSiteUrl = nul
   return `<?php
 /**
  * WordPress Configuration - NodusCommand
- * Project: ${projectName}
+ * Project: ${String(projectName).replace(/\*\//g, '').replace(/[\r\n]+/g, ' ')}
  */
 
 // Database settings

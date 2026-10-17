@@ -42,6 +42,19 @@ program
 program
   .command("init")
   .description("Initialize a new WordPress project")
+  .option("-y, --yes", "Non-interactive: take everything from flags (local database, no SSH)")
+  .option("--name <name>", "Project name (required with --yes)")
+  .option("--domain <domain>", "Local domain (default: <slug>.localhost)")
+  .option("--wp-version <version>", "WordPress version (default: 6.7)")
+  .option("--existing", "Existing project (keeps ./wp-content) instead of a blank one")
+  .option("--db-name <name>", "Local database name (default: wordpress)")
+  .option("--db-user <user>", "Local database user (default: wordpress)")
+  .option("--db-password <password>", "Local database password (default: wordpress)")
+  .option("--http-port <port>", "Local Apache port (default: 8080)")
+  .option("--mysql-port <port>", "Local MySQL port (default: 3306)")
+  .option("--https", "Enable local HTTPS (self-signed)")
+  .option("--https-port <port>", "Local HTTPS port (default: 8443)")
+  .option("--no-hosts", "Do not manage the hosts entry on 'noduscm up'")
   .option(
     "--mount <entry>",
     "Add custom bind mount entry (repeatable)",

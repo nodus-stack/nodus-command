@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-10-17
+
+### Added
+- `noduscm init --yes`: non-interactive init for scripts and agents. Everything comes from flags (`--name`, `--domain`, `--wp-version`, `--existing`, `--db-*`, `--http-port`, `--mysql-port`, `--https`, `--https-port`, `--no-hosts`, `--mount`) with the same defaults as the prompts. Local database only, no SSH (remote credentials stay in the interactive init).
+- MCP tool `project_init`: creates a project in `<root>/<slug>`, picks the first free ports among your projects and mounts theme/plugin folders. The project folder and mounted folders must be inside a `--root`, and mounts can only target `wp-content/themes|plugins|mu-plugins/<name>`. A failed init removes the half-created folder.
+
+### Fixed
+- WordPress download fails with a clear message on HTTP errors (e.g. a version that does not exist) instead of a tar error.
+- The project name can no longer close the comment at the top of `wp-config.php`.
+
 ## [1.4.0] - 2026-10-16
 
 ### Added
