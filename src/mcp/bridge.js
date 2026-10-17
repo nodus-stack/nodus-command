@@ -68,18 +68,31 @@ function localLookup(hostname, options, callback) {
     if (options && options.all) return callback(null, [{ address: '127.0.0.1', family: 4 }]);
     return callback(null, '127.0.0.1', 4);
   }
-  return dnsLookup(hostname, options, callback);
+  // Solo llegan IPs loopback literales (allowedOrigins); cualquier otra cosa se rechaza.
+  return dnsLookup(hostname, options, (err, address, family) => {
+    if (err) return callback(err);
+    const list = Array.isArray(address) ? address : [{ address, family }];
+    if (!list.every((a) => isLoopbackHost(a.address))) return callback(new Error(`${hostname} is not a loopback address`));
+    return callback(null, address, family);
+  });
 }
 
 // Certificados locales (mkcert) pueden no estar en el almacén de Node: solo se
 // usa contra los orígenes de tus proyectos.
 const localAgent = new Agent({ connect: { rejectUnauthorized: false, lookup: localLookup } });
 
+/** Solo loopback: localhost, *.localhost o 127.x / ::1 (nada de la red local). */
+export function isLoopbackHost(hostname) {
+  const h = String(hostname).toLowerCase().replace(/^\[|\]$/g, '');
+  return h === 'localhost' || h.endsWith('.localhost') || /^127(\.\d{1,3}){3}$/.test(h) || h === '::1';
+}
+
 async function allowedOrigins(roots) {
   const origins = new Set();
   for (const p of await listProjects(roots)) {
     try {
-      origins.add(new URL(p.url).origin);
+      const u = new URL(p.url);
+      if ((u.protocol === 'http:' || u.protocol === 'https:') && isLoopbackHost(u.hostname)) origins.add(u.origin);
     } catch {
       // URL inválida
     }
@@ -208,8 +221,13 @@ export async function runBridge({ device, roots = [], allowExec = false, version
       });
 
       ws.on('close', (code) => {
+        if (code === 4001) {
+          log('This device was removed in /connect. Run "noduscm connect --reset" to pair it again.');
+          resolve({ unauthorized: true });
+          return;
+        }
         if (code === 4000) {
-          log('Another "noduscm connect" took over this device.');
+          log('⚠ Another "noduscm connect" took over this device. If it was not you, remove the device in /connect and run "noduscm connect --reset".');
           resolve({ replaced: true });
           return;
         }

@@ -15,10 +15,25 @@ export function isValidBranch(name) {
   return typeof name === 'string' && BRANCH_RE.test(name) && !name.includes('..') && !name.endsWith('/') && !name.endsWith('.lock') && !name.includes('//');
 }
 
+// El .git montado es escribible desde el contenedor: nunca ejecutar hooks,
+// fsmonitor ni transportes "ext" que el sitio pudiera haber configurado.
+const SAFE = ['-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', '-c', 'protocol.ext.allow=never'];
+
+// Claves de .git/config (local) que ejecutan programas: si el sitio las añadió, no se toca el repo.
+const DANGEROUS_KEY = /^(core\.(sshcommand|fsmonitor|hookspath|pager|editor|askpass|gitproxy)|filter\.|diff\.[^.]+\.(textconv|command)|merge\.[^.]+\.driver|credential\.|gpg\.|url\.|remote\.[^.]+\.(uploadpack|receivepack|vcs)|uploadpack\.|alias\.|include\.|includeif\.|sequence\.editor)/i;
+
+async function assertSafeConfig(repoPath) {
+  const r = await execa('git', ['config', '--local', '--name-only', '--list'], { cwd: repoPath, reject: false, timeout: 15000 });
+  const bad = String(r.stdout || '').split('\n').filter((k) => DANGEROUS_KEY.test(k.trim()));
+  if (bad.length) {
+    throw new ToolError(`Refusing to run git: ${repoPath}/.git/config sets ${bad.join(', ')} (could run programs on this machine). Remove them with "git config --local --unset <key>" if they are yours.`);
+  }
+}
+
 async function git(cwd, args, { reject = true, timeout = 120000 } = {}) {
-  const result = await execa('git', args, { cwd, reject: false, all: true, timeout, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+  const result = await execa('git', [...SAFE, ...args], { cwd, reject: false, all: true, timeout, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
   if (reject && result.exitCode !== 0) {
-    throw new ToolError(`git ${args[0]} failed: ${String(result.all || '').trim().split('\n').slice(-5).join('\n')}`);
+    throw new ToolError(`git ${args[0]} failed: ${scrub(String(result.all || '').trim().split('\n').slice(-5).join('\n'))}`);
   }
   return result;
 }
@@ -32,6 +47,13 @@ function remoteSlug(url) {
 
 function cleanUrl(url) {
   return String(url || '').replace(/(https?:\/\/)[^@/]+@/, '$1');
+}
+
+/** Quita credenciales de URLs y tokens conocidos de la salida de git/gh. */
+function scrub(text) {
+  return String(text || '')
+    .replace(/(https?:\/\/)[^@/\s]+@/g, '$1')
+    .replace(/\b(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, '***');
 }
 
 /**
@@ -70,12 +92,13 @@ export async function resolveRepo(root, config, ref) {
 }
 
 export async function repoStatus(repoPath, { fetch = false } = {}) {
+  await assertSafeConfig(repoPath);
   const branch = await out(repoPath, ['branch', '--show-current']);
   const remote = (await git(repoPath, ['remote', 'get-url', 'origin'], { reject: false })).stdout?.trim() || '';
   let fetchError = null;
   if (fetch) {
     const r = await git(repoPath, ['fetch', 'origin', '--prune', '--quiet'], { reject: false, timeout: 60000 });
-    if (r.exitCode !== 0) fetchError = firstLine(r.all);
+    if (r.exitCode !== 0) fetchError = scrub(firstLine(r.all));
   }
   const porcelain = (await git(repoPath, ['status', '--porcelain=v1'])).stdout || '';
   const changes = porcelain
@@ -138,6 +161,7 @@ async function hasGh() {
 export async function publish(repoPath, { message, targetBranch, mode = 'direct', paths, branch, mergePr = false, slug = 'site' }) {
   if (!isValidBranch(targetBranch)) throw new ToolError('target_branch is not a valid branch name.');
   if (branch && !isValidBranch(branch)) throw new ToolError('branch is not a valid branch name.');
+  await assertSafeConfig(repoPath);
   const current = await out(repoPath, ['branch', '--show-current']);
   if (!current) throw new ToolError('The repo is in detached HEAD: check out a branch first.');
   const remote = (await git(repoPath, ['remote', 'get-url', 'origin'], { reject: false })).stdout?.trim();
@@ -169,13 +193,13 @@ export async function publish(repoPath, { message, targetBranch, mode = 'direct'
           all: true,
           timeout: 60000,
         });
-        if (created.exitCode !== 0) throw new ToolError(`gh pr create failed: ${firstLine(created.all)}`);
+        if (created.exitCode !== 0) throw new ToolError(`gh pr create failed: ${scrub(firstLine(created.all))}`);
         url = created.stdout.trim().split('\n').pop();
       }
       result.pr_url = url;
       if (mergePr) {
         const merged = await execa('gh', ['pr', 'merge', url, '--merge'], { cwd: repoPath, reject: false, all: true, timeout: 120000 });
-        if (merged.exitCode !== 0) throw new ToolError(`PR created (${url}) but merge failed: ${firstLine(merged.all)}`);
+        if (merged.exitCode !== 0) throw new ToolError(`PR created (${url}) but merge failed: ${scrub(firstLine(merged.all))}`);
         result.merged = true;
       }
     } else if (result.repo) {
@@ -191,7 +215,7 @@ export async function publish(repoPath, { message, targetBranch, mode = 'direct'
     const rebase = await git(repoPath, ['pull', '--rebase', 'origin', targetBranch], { reject: false, timeout: 180000 });
     if (rebase.exitCode !== 0) {
       await git(repoPath, ['rebase', '--abort'], { reject: false });
-      throw new ToolError(`Could not rebase on origin/${targetBranch} (conflicts?). Your commit is kept locally; resolve it or use mode "pr".\n${firstLine(rebase.all)}`);
+      throw new ToolError(`Could not rebase on origin/${targetBranch} (conflicts?). Your commit is kept locally; resolve it or use mode "pr".\n${scrub(firstLine(rebase.all))}`);
     }
     await git(repoPath, ['push', 'origin', `HEAD:refs/heads/${targetBranch}`], { timeout: 180000 });
     return Object.assign(result, { branch: current, commit: await out(repoPath, ['rev-parse', '--short', 'HEAD']), pushed: true, committed: Boolean(sha) });

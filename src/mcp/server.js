@@ -194,7 +194,9 @@ export function buildServer({ roots = [], allowExec = false } = {}) {
       const { config } = await resolveProject(ref, roots);
       if (args[0] === 'wp') args = args.slice(1);
       // Ejecutar PHP arbitrario (eval, shell, --exec, --require, paquetes) solo con --allow-exec.
-      const runsCode = ['shell', 'eval', 'eval-file', 'package'].includes(args[0]) || args.some((a) => /^--(exec|require)(=|$)/.test(a));
+      // plugin/theme install desde una URL o un zip también es código arbitrario.
+      const installsFromSource = ['plugin', 'theme'].includes(args[0]) && args[1] === 'install' && args.slice(2).some((a) => !a.startsWith('--') && /[/:\\]|\.zip$/i.test(a));
+      const runsCode = ['shell', 'eval', 'eval-file', 'package'].includes(args[0]) || installsFromSource || args.some((a) => /^--(exec|require)(=|$)/.test(a));
       if (runsCode && !allowExec) {
         throw new ToolError('That WP-CLI command runs arbitrary PHP: start the server with --allow-exec to enable it.');
       }
