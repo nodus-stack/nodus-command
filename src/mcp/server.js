@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { registerProject, scanForProjects } from '../lib/registry.js';
 import { ToolError, listProjects, projectStatus, redactConfig, resolveProject, siteUrl } from './projects.js';
 import { containerLogs, runCli, runInContainer, runWpCli } from './runner.js';
+import { projectRepos, publish, repoStatus, resolveRepo } from './git.js';
 
 const VERSION = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version;
 
@@ -360,6 +361,110 @@ export function buildServer({ roots = [], allowExec = false } = {}) {
       const { root, config } = await resolveProject(ref, roots);
       requireConfirm(config, confirm, 'This deletes the local containers and database.');
       return cliResult(`noduscm remove (${config.slug})`, await runCli(root, ['remove', '--yes'], { timeoutMs: 5 * 60 * 1000 }));
+    })
+  );
+
+  server.registerTool(
+    'site_pair_code',
+    {
+      title: 'Código de vinculación del sitio local',
+      description:
+        'Genera un código de Nodus Jet en el WordPress local (para vincularlo al conector de Nodus Designer) y devuelve la URL local. ' +
+        'Lo usa link_local_site del conector remoto; el proyecto debe estar corriendo con Nodus Jet y Nodus Designer activos.',
+      inputSchema: { project },
+      annotations: rw,
+    },
+    safe(async ({ project: ref }) => {
+      const { config } = await resolveProject(ref, roots);
+      const php = String.raw`
+        if (!class_exists('\Vanjex\NodusStack\NodusJet\CliTokens')) { fwrite(STDERR, 'Nodus Jet is not active'); exit(1); }
+        if (!class_exists('\Vanjex\NodusStack\NodusDesigner\McpApi')) { fwrite(STDERR, 'Nodus Designer is not active'); exit(1); }
+        $admins = get_users(['role' => 'administrator', 'number' => 1, 'fields' => 'ID']);
+        if (!$admins) { fwrite(STDERR, 'No administrator user'); exit(1); }
+        echo \Vanjex\NodusStack\NodusJet\CliTokens::create_pair_code((int) $admins[0])['code'];`;
+      const result = await runWpCli(config, ['eval', php]);
+      const code = result.output.split('\n').pop()?.trim() ?? '';
+      if (!result.ok || !/^[A-Za-z0-9_-]{6,}$/.test(code)) {
+        throw new ToolError(`Could not create the pairing code: ${result.output || 'unknown error'}`);
+      }
+      return text({ url: siteUrl(config), code }, `Pairing code created for ${siteUrl(config)}.`);
+    })
+  );
+
+  server.registerTool(
+    'project_repos',
+    {
+      title: 'Repos Git del proyecto',
+      description:
+        'Temas y plugins del proyecto que son clones Git montados desde tu equipo (mounts de .noduscm.json): rama, remoto, ' +
+        'cambios sin commit y commits sin subir. Es donde Nodus Designer guarda lo que se crea en el sitio local.',
+      inputSchema: { project },
+      annotations: ro,
+    },
+    safe(async ({ project: ref }) => {
+      const { root, config } = await resolveProject(ref, roots);
+      const repos = await projectRepos(root, config);
+      const out = [];
+      for (const repo of repos) {
+        const status = await repoStatus(repo.path);
+        out.push({ ...repo, branch: status.branch, github: status.github, changes_count: status.changes_count, ahead: status.ahead, behind: status.behind });
+      }
+      return text({ repos: out }, out.length ? undefined : 'No Git repos mounted in this project (mounts in .noduscm.json).');
+    })
+  );
+
+  server.registerTool(
+    'git_status',
+    {
+      title: 'Estado Git',
+      description: 'Rama, archivos cambiados, commits sin subir (ahead) y commits nuevos en GitHub (behind) de un repo del proyecto. fetch=true consulta GitHub antes.',
+      inputSchema: { project, repo: z.string().optional().describe('Nombre de project_repos (opcional si solo hay uno)'), fetch: z.boolean().default(true) },
+      annotations: ro,
+    },
+    safe(async ({ project: ref, repo, fetch }) => {
+      const { root, config } = await resolveProject(ref, roots);
+      const target = await resolveRepo(root, config, repo);
+      return text({ repo: target.name, ...(await repoStatus(target.path, { fetch })) });
+    })
+  );
+
+  server.registerTool(
+    'git_publish',
+    {
+      title: 'Publicar cambios en GitHub',
+      description:
+        'Hace commit de los cambios del repo y los lleva a target_branch, la rama conectada en producción (jet.repos_list en el conector). ' +
+        'mode "direct": commit, rebase/merge e integra directo en target_branch. mode "pr": rama de trabajo, push y PR hacia target_branch ' +
+        '(merge_pr=true lo mergea con GitHub CLI). Después, en producción: jet.repo_pull. Pide aprobación del usuario antes.',
+      inputSchema: {
+        project,
+        repo: z.string().optional().describe('Nombre de project_repos (opcional si solo hay uno)'),
+        message: z.string().min(3).max(500).describe('Mensaje del commit / título del PR'),
+        target_branch: z.string().max(200).describe('Rama conectada en producción, p. ej. "main"'),
+        mode: z.enum(['direct', 'pr']).default('direct'),
+        paths: z.array(z.string().max(500)).max(200).optional().describe('Solo estos archivos (relativos al repo); por defecto todos los cambios'),
+        branch: z.string().max(200).optional().describe('mode pr: nombre de la rama de trabajo'),
+        merge_pr: z.boolean().default(false),
+      },
+      annotations: { ...rw, openWorldHint: true },
+    },
+    safe(async ({ project: ref, repo, message, target_branch, mode, paths, branch, merge_pr }) => {
+      const { root, config } = await resolveProject(ref, roots);
+      const target = await resolveRepo(root, config, repo);
+      const result = await publish(target.path, {
+        message,
+        targetBranch: target_branch,
+        mode,
+        paths,
+        branch,
+        mergePr: merge_pr,
+        slug: config.slug,
+      });
+      const summary =
+        mode === 'pr'
+          ? `Changes pushed to ${result.branch}${result.pr_url ? `; PR: ${result.pr_url}` : ''}${result.merged ? ' (merged)' : ''}.`
+          : `Changes integrated into ${target_branch} (${result.commit}) and pushed.`;
+      return text({ repo: target.name, ...result }, `${summary}\nNext: pull in production (jet.repo_pull) once ${target_branch} has the changes.`);
     })
   );
 

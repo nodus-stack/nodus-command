@@ -2,7 +2,7 @@
 
 `noduscm mcp` levanta un servidor MCP **local** para que Claude Code, Claude Desktop o tu propia interfaz de agentes gestionen tus proyectos de NodusCommand. Pueden arrancarlos y detenerlos, correr WP-CLI, traer datos de producción, hacer backups y leer los logs.
 
-El conector remoto de Nodus (`mcp.nodusproject.dev`) no puede entrar a tu equipo. Para los sitios locales se usa este servidor; para los sitios en producción, el conector remoto.
+Si prefieres usar el conector de Nodus en la nube (`mcp.nodusproject.dev`, el mismo de claude.ai), usa `noduscm connect` (abajo): Claude podrá diseñar en tus sitios locales y usar estas mismas herramientas.
 
 ## Conectar
 
@@ -68,3 +68,46 @@ Además, `noduscm init` y `noduscm up` guardan cada proyecto en `~/.config/nodus
 - **Nada pide contraseña ni sudo.** El servidor ejecuta los comandos con `NODUSCM_NON_INTERACTIVE=1`. Si hace falta tocar `/etc/hosts` o correr `mkcert -install`, lo dice en la salida y tienes que hacerlo una vez desde tu terminal.
 - **Confirmación.** Lo que borra o reemplaza datos locales exige `confirm = slug` del proyecto: traer la DB, restaurar un backup, `import_db` con `force`, `rebootstrap --force` y `remove`.
 - **Contraseñas.** `project_info` nunca devuelve las de la DB ni las de SSH.
+
+## Conector en la nube: `noduscm connect`
+
+Conecta tu equipo al conector de Nodus para que Claude (claude.ai, Claude Desktop o el móvil) trabaje con tus sitios locales. La conexión es **saliente** (WebSocket): no se abre ningún puerto en tu equipo.
+
+```bash
+# 1. En https://mcp.nodusproject.dev/connect → "Generar código de equipo" (vale 10 min, un uso)
+# 2. Empareja una vez y déjalo corriendo
+noduscm connect --code NCM-XXXX-XXXX --root ~/WorkspacePHP
+# Las siguientes veces basta con:
+noduscm connect
+```
+
+| Opción | Para qué |
+| --- | --- |
+| `--server <url>` | Otro conector (por defecto el guardado o `https://mcp.nodusproject.dev`) |
+| `--name <nombre>` | Nombre del equipo en Claude (por defecto el hostname) |
+| `--root <dir>` | Carpetas donde buscar proyectos (repetible) |
+| `--allow-exec` | Igual que en `noduscm mcp` |
+| `--reset` | Olvida el emparejamiento y vuelve a emparejar |
+
+Las credenciales quedan en `~/.config/noduscm/device.json` (permisos 600). Para revocar el equipo, quítalo en `/connect`.
+
+El conector solo puede llamar a las URLs locales de tus proyectos registrados (`*.localhost` siempre va a 127.0.0.1); nada más de tu red.
+
+### Flujo local → producción con Git
+
+1. Monta el clon de tu tema en el proyecto (`mounts` en `.noduscm.json`, ver `07-custom-mounts.md`) y levántalo (`noduscm up`).
+2. En Claude: *"vincula mi sitio local"* → `link_local_site`. El sitio aparece como `local-…` y funcionan todas las tools de diseño y el preview.
+3. Diseña y revisa el preview. Al guardar, los archivos del tema cambian en tu clon.
+4. Cuando lo apruebes, Claude revisa la rama conectada en producción (`jet.repos_list`) y ejecuta `git_publish`:
+   - `mode: "direct"`: commit y merge a esa rama (en un worktree temporal si estás en otra rama) y push.
+   - `mode: "pr"`: rama de trabajo + PR hacia la rama conectada (con `gh`; si no está, te da la URL). `merge_pr: true` lo mergea.
+5. En producción, `jet.repo_pull` (Nodus Jet) trae los cambios.
+
+| Tool | Qué hace |
+| --- | --- |
+| `project_repos` | Repos Git montados en el proyecto (temas/plugins) |
+| `git_status` | Rama, cambios, ahead/behind |
+| `git_publish` | Commit + publicar en la rama conectada (direct o PR) |
+| `site_pair_code` | Código para vincular el sitio local al conector (lo usa `link_local_site`) |
+
+Git usa tus credenciales (SSH o el helper de credenciales); no se guardan en el conector.

@@ -3,6 +3,7 @@
 import { readFileSync } from "fs";
 import { Command } from "commander";
 import backupCommand from "../src/commands/backup.js";
+import connectCommand from "../src/commands/connect.js";
 import downCommand from "../src/commands/down.js";
 import generateCommand from "../src/commands/generate.js";
 import importDbCommand from "../src/commands/import-db.js";
@@ -157,5 +158,21 @@ program
   )
   .option("--allow-exec", "Enable container_exec and wp shell/eval-file (arbitrary commands)")
   .action(mcpCommand);
+
+program
+  .command("connect")
+  .description("Connect this machine to the Nodus connector so Claude can design on your local sites and run noduscm commands")
+  .option("--server <url>", "Connector URL (default: saved one or https://mcp.nodusproject.dev)")
+  .option("--code <code>", "Device code from <server>/connect (NCM-XXXX-XXXX)")
+  .option("--name <name>", "Name shown in Claude (default: hostname)")
+  .option(
+    "--root <dir>",
+    "Also discover projects under this folder (repeatable)",
+    (value, previous = []) => [...previous, value],
+    [],
+  )
+  .option("--allow-exec", "Enable container_exec and wp shell/eval-file (arbitrary commands)")
+  .option("--reset", "Forget the saved device and pair again")
+  .action(connectCommand);
 
 program.parse();

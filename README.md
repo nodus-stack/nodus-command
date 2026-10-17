@@ -252,6 +252,17 @@ NODUSCM_MCP_TOKEN=a-long-token noduscm mcp --http 7337 --cors http://localhost:5
 
 Commands run non-interactively: nothing asks for passwords or sudo. Destructive tools require `confirm = <project slug>`. See [`examples/13-mcp.en.md`](examples/13-mcp.en.md).
 
+### `noduscm connect`
+Connect this machine to the Nodus connector (the same one you use in claude.ai) so Claude can design templates on your local sites and run the commands above, including Git. The connection is outbound only: no port is opened on your machine.
+
+```bash
+# 1. In https://mcp.nodusproject.dev/connect → "Generar código de equipo"
+# 2. Pair once and keep it running
+noduscm connect --code NCM-XXXX-XXXX --root ~/WorkspacePHP
+```
+
+Typical flow: mount your theme clone in the project, ask Claude to link the local site (`link_local_site`), design and preview, then `git_publish` sends the changes to the branch connected in production (direct merge or PR) and Nodus Jet pulls them there.
+
 ## Configuration
 
 NodusCommand stores project configuration in `.noduscm.json`:
