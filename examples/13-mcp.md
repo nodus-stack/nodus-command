@@ -52,6 +52,7 @@ Además, `noduscm init` y `noduscm up` guardan cada proyecto en `~/.config/nodus
 | Tool | Qué hace |
 | --- | --- |
 | `list_projects`, `register_project` | Proyectos del equipo |
+| `project_init` | `noduscm init --yes`: proyecto nuevo en `<root>/<slug>` (DB local, sin SSH), puertos libres automáticos y montaje de temas/plugins desde dentro de un `--root` |
 | `project_info`, `project_status` | Config sin contraseñas, URLs, contenedores |
 | `project_up`, `project_down` | `noduscm up` / `down` |
 | `project_logs` | Logs de Apache (errores PHP) o MySQL |
@@ -68,6 +69,7 @@ Además, `noduscm init` y `noduscm up` guardan cada proyecto en `~/.config/nodus
 - **Nada pide contraseña ni sudo.** El servidor ejecuta los comandos con `NODUSCM_NON_INTERACTIVE=1`. Si hace falta tocar `/etc/hosts` o correr `mkcert -install`, lo dice en la salida y tienes que hacerlo una vez desde tu terminal.
 - **Confirmación.** Lo que borra o reemplaza datos locales exige `confirm = slug` del proyecto: traer la DB, restaurar un backup, `import_db` con `force`, `rebootstrap --force` y `remove`.
 - **Contraseñas.** `project_info` nunca devuelve las de la DB ni las de SSH.
+- **`project_init` no sale de `--root`.** La carpeta del proyecto y las carpetas montadas tienen que estar dentro de un `--root` (los symlinks se resuelven antes), y solo se puede montar en `wp-content/themes|plugins|mu-plugins/<nombre>`. Sin `--root` la tool no funciona.
 
 ## Conector en la nube: `noduscm connect`
 
