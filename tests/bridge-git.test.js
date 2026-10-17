@@ -114,3 +114,35 @@ describe('git hardening', () => {
     for (const h of ['192.168.1.1', '169.254.169.254', 'localhost.evil.com', 'example.com', '10.0.0.1']) expect(isLoopbackHost(h)).toBe(false);
   });
 });
+
+describe('publish confirmation', () => {
+  it('only asks for pushes to the target branch', async () => {
+    const { needsPublishConfirm } = await import('../src/mcp/bridge.js');
+    expect(needsPublishConfirm('git_publish', { mode: 'direct' })).toBe(true);
+    expect(needsPublishConfirm('git_publish', {})).toBe(true);
+    expect(needsPublishConfirm('git_publish', { mode: 'pr' })).toBe(false);
+    expect(needsPublishConfirm('git_publish', { mode: 'pr', merge_pr: true })).toBe(true);
+    expect(needsPublishConfirm('git_status', {})).toBe(false);
+  });
+
+  it('reads y/N from a TTY, rejects without TTY or answer', async () => {
+    const { PassThrough } = await import('stream');
+    const { askInTerminal } = await import('../src/mcp/bridge.js');
+    const tty = () => Object.assign(new PassThrough(), { isTTY: true });
+    const output = new PassThrough();
+    output.resume();
+
+    let input = tty();
+    let p = askInTerminal('Allow? ', { input, output });
+    setTimeout(() => input.write('s\n'), 20);
+    expect(await p).toBe(true);
+
+    input = tty();
+    p = askInTerminal('Allow? ', { input, output });
+    setTimeout(() => input.write('\n'), 20);
+    expect(await p).toBe(false);
+
+    expect(await askInTerminal('Allow? ', { input: new PassThrough(), output })).toBe(false);
+    expect(await askInTerminal('Allow? ', { input: tty(), output, timeoutMs: 50 })).toBe(false);
+  });
+});

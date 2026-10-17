@@ -172,6 +172,7 @@ program
     [],
   )
   .option("--allow-exec", "Enable container_exec and wp shell/eval-file (arbitrary commands)")
+  .option("--no-confirm-publish", "Do not ask in this terminal before pushing to the production branch (git_publish)")
   .option("--reset", "Forget the saved device and pair again")
   .action(connectCommand);
 

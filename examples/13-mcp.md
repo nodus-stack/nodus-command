@@ -87,6 +87,7 @@ noduscm connect
 | `--name <nombre>` | Nombre del equipo en Claude (por defecto el hostname) |
 | `--root <dir>` | Carpetas donde buscar proyectos (repetible) |
 | `--allow-exec` | Igual que en `noduscm mcp` |
+| `--no-confirm-publish` | No preguntar en la terminal antes de subir a la rama de producción |
 | `--reset` | Olvida el emparejamiento y vuelve a emparejar |
 
 Las credenciales quedan en `~/.config/noduscm/device.json` (permisos 600). Para revocar el equipo, quítalo en `/connect`.
@@ -110,4 +111,6 @@ El conector solo puede llamar a las URLs locales de tus proyectos registrados (`
 | `git_publish` | Commit + publicar en la rama conectada (direct o PR) |
 | `site_pair_code` | Código para vincular el sitio local al conector (lo usa `link_local_site`) |
 
-Git usa tus credenciales (SSH o el helper de credenciales); no se guardan en el conector.
+**Confirmación en tu terminal.** Antes de subir algo a la rama de producción (`git_publish` en modo `direct`, o `pr` con `merge_pr`), `noduscm connect` muestra el proyecto, la rama, el mensaje y los archivos, y espera `y`/`s`. Si respondes otra cosa o pasan 10 minutos, no se hace commit ni push. Así, aunque Claude rellene `confirm`, nada llega a producción sin que lo aceptes tú. Si `connect` corre sin terminal (servicio), se rechaza: usa `--no-confirm-publish` solo si sabes lo que haces.
+
+Git usa tus credenciales (SSH o el helper de credenciales); no se guardan en el conector. Por seguridad, Git corre sin hooks y se niega a operar si el `.git/config` del repo tiene claves que ejecutan programas.

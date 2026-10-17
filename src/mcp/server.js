@@ -437,7 +437,8 @@ export function buildServer({ roots = [], allowExec = false } = {}) {
       description:
         'Hace commit de los cambios del repo y los lleva a target_branch, la rama conectada en producción (jet.repos_list en el conector). ' +
         'mode "direct": commit, rebase/merge e integra directo en target_branch. mode "pr": rama de trabajo, push y PR hacia target_branch ' +
-        '(merge_pr=true lo mergea con GitHub CLI). Después, en producción: jet.repo_pull. Pide aprobación del usuario antes.',
+        '(merge_pr=true lo mergea con GitHub CLI). Después, en producción: jet.repo_pull. Pide aprobación del usuario antes. Con noduscm connect, ' +
+        'direct y merge_pr además piden confirmación al usuario en su terminal: avísale que la acepte allí.',
       inputSchema: {
         project,
         repo: z.string().optional().describe('Nombre de project_repos (opcional si solo hay uno)'),

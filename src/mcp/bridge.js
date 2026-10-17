@@ -2,6 +2,7 @@ import os from 'os';
 import path from 'path';
 import fs from 'fs-extra';
 import { lookup as dnsLookup } from 'dns';
+import readline from 'readline/promises';
 import WebSocket from 'ws';
 import { Agent, fetch as undiciFetch } from 'undici';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -139,6 +140,74 @@ export async function handleHttp(msg, roots) {
 }
 
 // ---------------------------------------------------------------------------
+// Confirmación en la terminal antes de publicar en la rama de producción
+// ---------------------------------------------------------------------------
+
+const CONFIRM_TIMEOUT_MS = 10 * 60 * 1000;
+
+/** ¿Esta llamada sube cambios a la rama conectada en producción? */
+export function needsPublishConfirm(name, args = {}) {
+  if (name !== 'git_publish') return false;
+  return (args.mode ?? 'direct') === 'direct' || args.merge_pr === true;
+}
+
+let promptQueue = Promise.resolve();
+
+/** Pregunta s/N en la terminal (una a la vez). Sin TTY o sin respuesta en 10 min: no. */
+export function askInTerminal(question, { input = process.stdin, output = process.stdout, timeoutMs = CONFIRM_TIMEOUT_MS } = {}) {
+  const run = async () => {
+    if (!input.isTTY) return false;
+    const rl = readline.createInterface({ input, output });
+    try {
+      output.write('\x07'); // campana: llama la atención si la terminal está en segundo plano
+      const answer = await rl.question(question, { signal: AbortSignal.timeout(timeoutMs) });
+      return /^(s|si|sí|y|yes)$/i.test(answer.trim());
+    } catch {
+      output.write('\n(no answer, rejected)\n');
+      return false;
+    } finally {
+      rl.close();
+    }
+  };
+  const result = promptQueue.then(run, run);
+  promptQueue = result.catch(() => undefined);
+  return result;
+}
+
+async function confirmPublish(client, args, log) {
+  let details = '';
+  try {
+    const status = await client.callTool({ name: 'git_status', arguments: { project: args.project, ...(args.repo ? { repo: args.repo } : {}) } });
+    const s = status.structuredContent || {};
+    const files = (s.changes || []).map((c) => `    ${c.status.padEnd(2)} ${c.file}`);
+    const shown = args.paths?.length ? args.paths.map((p) => `    ${p}`) : files;
+    details = [
+      `  Repo:    ${s.github || s.remote || s.path || '?'} (local branch ${s.branch || '?'})`,
+      `  Changes: ${shown.length ? '' : 'none (only commits already made)'}`,
+      ...shown.slice(0, 15),
+      ...(shown.length > 15 ? [`    … and ${shown.length - 15} more`] : []),
+    ].join('\n');
+  } catch {
+    // sin detalles
+  }
+  const how = (args.mode ?? 'direct') === 'direct' ? 'direct merge + push' : 'PR + merge';
+  log(
+    [
+      '',
+      '━━━ Claude wants to publish to production ━━━',
+      `  Project: ${args.project}`,
+      `  Target:  ${args.target_branch} (${how})`,
+      `  Message: ${args.message}`,
+      details,
+      '',
+    ]
+      .filter((l) => l !== '')
+      .join('\n')
+  );
+  return askInTerminal('Allow? [y/N] ');
+}
+
+// ---------------------------------------------------------------------------
 // Conexión
 // ---------------------------------------------------------------------------
 
@@ -146,7 +215,7 @@ export async function handleHttp(msg, roots) {
  * Mantiene la conexión con el servidor (reconecta sola). Resuelve solo si el
  * servidor rechaza el token (equipo quitado en /connect).
  */
-export async function runBridge({ device, roots = [], allowExec = false, version = '0.0.0', log = console.log }) {
+export async function runBridge({ device, roots = [], allowExec = false, confirmPublish: mustConfirm = true, version = '0.0.0', log = console.log }) {
   const mcp = buildServer({ roots, allowExec });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await mcp.connect(serverTransport);
@@ -164,7 +233,7 @@ export async function runBridge({ device, roots = [], allowExec = false, version
       ws.on('open', () => {
         attempt = 0;
         log(`Connected to ${device.server} as "${device.name}". Waiting for requests… (Ctrl+C to stop)`);
-        ws.send(JSON.stringify({ type: 'hello', name: device.name, version, allow_exec: allowExec, platform: process.platform }));
+        ws.send(JSON.stringify({ type: 'hello', name: device.name, version, allow_exec: allowExec, confirm_publish: mustConfirm, platform: process.platform }));
       });
 
       ws.on('ping', () => {
@@ -191,6 +260,18 @@ export async function runBridge({ device, roots = [], allowExec = false, version
             result = { tools: tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema, annotations: t.annotations })) };
           } else if (msg.type === 'tool') {
             log(`→ ${msg.name}`);
+            if (mustConfirm && needsPublishConfirm(msg.name, msg.args)) {
+              const allowed = await confirmPublish(client, msg.args || {}, log);
+              if (!allowed) {
+                log('✗ Rejected.');
+                throw new Error(
+                  process.stdin.isTTY
+                    ? `The user rejected the publish in the "${device.name}" terminal (or did not answer in 10 min). Nothing was committed or pushed.`
+                    : `Publishing to ${msg.args?.target_branch} needs confirmation in the "noduscm connect" terminal, but it is not running in an interactive terminal. Run it in a terminal, or start it with --no-confirm-publish.`
+                );
+              }
+              log('✓ Allowed.');
+            }
             result = await client.callTool({ name: String(msg.name), arguments: msg.args || {} }, undefined, { timeout: 35 * 60 * 1000 });
           } else {
             throw new Error(`Unknown request type: ${msg.type}`);

@@ -40,7 +40,8 @@ export default async function connectCommand(options = {}) {
     }
 
     if (options.allowExec) console.log('⚠ --allow-exec: Claude can run arbitrary commands in your containers.');
-    const result = await runBridge({ device, roots, allowExec: Boolean(options.allowExec), version });
+    if (options.confirmPublish === false) console.log('⚠ --no-confirm-publish: pushes to the production branch will not ask for confirmation.');
+    const result = await runBridge({ device, roots, allowExec: Boolean(options.allowExec), confirmPublish: options.confirmPublish !== false, version });
     process.exit(result?.unauthorized ? 1 : 0);
   } catch (error) {
     process.stderr.write(`noduscm connect: ${error.message}\n`);

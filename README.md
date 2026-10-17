@@ -261,7 +261,7 @@ Connect this machine to the Nodus connector (the same one you use in claude.ai) 
 noduscm connect --code NCM-XXXX-XXXX --root ~/WorkspacePHP
 ```
 
-Typical flow: mount your theme clone in the project, ask Claude to link the local site (`link_local_site`), design and preview, then `git_publish` sends the changes to the branch connected in production (direct merge or PR) and Nodus Jet pulls them there.
+Typical flow: mount your theme clone in the project, ask Claude to link the local site (`link_local_site`), design and preview, then `git_publish` sends the changes to the branch connected in production (direct merge or PR) and Nodus Jet pulls them there. Before any push to that branch, `noduscm connect` asks you to confirm in the terminal (`--no-confirm-publish` turns it off).
 
 ## Configuration
 

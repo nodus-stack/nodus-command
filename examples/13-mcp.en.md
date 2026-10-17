@@ -87,6 +87,7 @@ noduscm connect
 | `--name <name>` | Device name shown in Claude (default: hostname) |
 | `--root <dir>` | Folders to discover projects in (repeatable) |
 | `--allow-exec` | Same as in `noduscm mcp` |
+| `--no-confirm-publish` | Do not ask in the terminal before pushing to the production branch |
 | `--reset` | Forget the pairing and pair again |
 
 Credentials are saved in `~/.config/noduscm/device.json` (mode 600). To revoke the device, remove it in `/connect`.
@@ -110,4 +111,6 @@ The connector can only call the local URLs of your registered projects (`*.local
 | `git_publish` | Commit + publish to the connected branch (direct or PR) |
 | `site_pair_code` | Code to link the local site to the connector (used by `link_local_site`) |
 
-Git uses your own credentials (SSH or credential helper); they are never stored in the connector.
+**Confirmation in your terminal.** Before pushing anything to the production branch (`git_publish` in `direct` mode, or `pr` with `merge_pr`), `noduscm connect` shows the project, branch, message and files, and waits for `y`. Any other answer, or no answer in 10 minutes, means no commit and no push. So even if Claude fills in `confirm`, nothing reaches production unless you accept it. If `connect` runs without a terminal (as a service), it is rejected: use `--no-confirm-publish` only if you know what you are doing.
+
+Git uses your own credentials (SSH or credential helper); they are never stored in the connector. For safety, Git runs without hooks and refuses to work if the repo's `.git/config` sets keys that run programs.
