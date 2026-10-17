@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Theme sync over HTTPS (proof of concept), no SSH required.** Works with sites running the Nodus Jet plugin (REST API `/wp-json/nodus-jet/v1`).
+  - `noduscm login --site <url>` — pair with a one-time code generated in wp-admin → Nodus Jet → CLI. The token is stored in `~/.config/noduscm/auth.json` (mode 600), never in the project. `logout` revokes it on the server; `whoami` shows the session.
+  - `noduscm theme init --name <name>` creates the theme on the site and a local folder; `theme clone <slug>` downloads an existing CLI theme.
+  - `noduscm theme push | pull` sync by manifest (only changed files), with `--dry-run`, `--delete` (deletions are opt-in) and `--force`. Push aborts if the server changed since the last sync; pull aborts if local edits would be overwritten.
+  - `noduscm theme dev` watches the folder and pushes every change; prints the preview URL (`?nodus_jet_preview=<slug>`).
+  - `.noduscmignore` (defaults: `node_modules/`, `.git/`, `*.map`, `.env`). Only whitelisted extensions are synced; dotfiles are never sent.
+- Dependency: `chokidar` (file watching).
+
 ## [1.3.0] - 2026-03-27
 
 ### Added
