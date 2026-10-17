@@ -5,14 +5,15 @@ import { loadConfig, getProjectPaths } from '../lib/config.js';
 import { containerRemove } from '../lib/container.js';
 import { confirmRemove } from '../ui/prompts.js';
 import fs from 'fs-extra';
+import { unregisterProject } from '../lib/registry.js';
 
-export default async function removeCommand() {
+export default async function removeCommand(options = {}) {
   try {
     const config = await loadConfig();
     const paths = getProjectPaths();
     
     // Ask for confirmation
-    const confirmed = await confirmRemove(config.name);
+    const confirmed = options.yes === true || (await confirmRemove(config.name));
     
     if (!confirmed) {
       console.log(chalk.yellow('\n  Removal cancelled\n'));
@@ -48,6 +49,8 @@ export default async function removeCommand() {
       }
     }
     
+    await unregisterProject(paths.root);
+
     spinner.succeed(chalk.green('Project removed successfully!'));
     
     console.log(chalk.yellow('\n  Note: WordPress core and wp-content were preserved'));

@@ -24,6 +24,7 @@ This folder documents real scenarios by use case, from local initialization to r
 10. **10 - Troubleshooting** · [EN](./10-troubleshooting.en.md) | [ES](./10-troubleshooting.md)
 11. **11 - Import database from file** · [EN](./11-import-db.en.md) | [ES](./11-import-db.md)
 12. **12 - Interactive shell in the container** · [EN](./12-shell.en.md) | [ES](./12-shell.md)
+13. **13 - AI agents with `noduscm mcp`** · [EN](./13-mcp.en.md) | [ES](./13-mcp.md)
 
 ## Recommended flow
 

@@ -79,7 +79,7 @@ export async function containerExec(engine, container, command, options = {}) {
   if (options.user) args.push('-u', options.user);
   args.push(container, 'sh', '-c', command);
 
-  await execa(engine, args, { stdio });
+  return execa(engine, args, { stdio });
 }
 
 export async function containerShell(engine, container, options = {}) {

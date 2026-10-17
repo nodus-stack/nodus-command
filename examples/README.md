@@ -24,6 +24,7 @@ Esta carpeta documenta escenarios reales por tipo de uso, desde inicialización 
 10. **10 - Troubleshooting** · [ES](./10-troubleshooting.md) | [EN](./10-troubleshooting.en.md)
 11. **11 - Importar base de datos desde archivo** · [ES](./11-import-db.md) | [EN](./11-import-db.en.md)
 12. **12 - Shell interactivo en el contenedor** · [ES](./12-shell.md) | [EN](./12-shell.en.md)
+13. **13 - Agentes de IA con `noduscm mcp`** · [ES](./13-mcp.md) | [EN](./13-mcp.en.md)
 
 ## Flujo recomendado
 

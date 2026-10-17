@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "fs";
 import { Command } from "commander";
 import backupCommand from "../src/commands/backup.js";
+import connectCommand from "../src/commands/connect.js";
 import downCommand from "../src/commands/down.js";
 import generateCommand from "../src/commands/generate.js";
 import importDbCommand from "../src/commands/import-db.js";
 import infoCommand from "../src/commands/info.js";
+import mcpCommand from "../src/commands/mcp.js";
 import { loginCommand, logoutCommand, whoamiCommand } from "../src/commands/login.js";
 import initCommand from "../src/commands/init.js";
 import pullCommand from "../src/commands/pull.js";
@@ -28,7 +31,7 @@ const program = new Command();
 program
   .name("noduscm")
   .description("Modern WordPress local development environment")
-  .version("1.3.1")
+  .version(JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version)
   .addHelpText("beforeAll", () => "\n" + renderLogo() + "\n")
   .hook("preAction", (thisCommand) => {
     if (thisCommand.args.length === 0) {
@@ -62,6 +65,7 @@ program
 program
   .command("remove")
   .description("Remove the WordPress project completely")
+  .option("--yes", "Skip the confirmation prompt")
   .action(removeCommand);
 
 program
@@ -143,6 +147,43 @@ program
   .description("Open a shell in the Apache container as webuser")
   .option("--root", "Connect as root instead of webuser")
   .action(shellCommand);
+
+program
+  .command("mcp")
+  .description("Run a local MCP server so AI agents can manage your projects")
+  .option("--http [port]", "Serve over HTTP on 127.0.0.1 (default port 7337) instead of stdio")
+  .option("--token <token>", "Bearer token for --http (default: NODUSCM_MCP_TOKEN or a random one)")
+  .option(
+    "--root <dir>",
+    "Also discover projects under this folder (repeatable)",
+    (value, previous = []) => [...previous, value],
+    [],
+  )
+  .option(
+    "--cors <origin>",
+    "Allow a browser origin to call the --http server, e.g. http://localhost:5173 (repeatable)",
+    (value, previous = []) => [...previous, value],
+    [],
+  )
+  .option("--allow-exec", "Enable container_exec and wp shell/eval-file (arbitrary commands)")
+  .action(mcpCommand);
+
+program
+  .command("connect")
+  .description("Connect this machine to the Nodus connector so Claude can design on your local sites and run noduscm commands")
+  .option("--server <url>", "Connector URL (default: saved one or https://mcp.nodusproject.dev)")
+  .option("--code <code>", "Device code from <server>/connect (NCM-XXXX-XXXX)")
+  .option("--name <name>", "Name shown in Claude (default: hostname)")
+  .option(
+    "--root <dir>",
+    "Also discover projects under this folder (repeatable)",
+    (value, previous = []) => [...previous, value],
+    [],
+  )
+  .option("--allow-exec", "Enable container_exec and wp shell/eval-file (arbitrary commands)")
+  .option("--no-confirm-publish", "Do not ask in this terminal before pushing to the production branch (git_publish)")
+  .option("--reset", "Forget the saved device and pair again")
+  .action(connectCommand);
 
 // --- Nodus Jet: sync de temas por HTTPS (sin SSH) ---------------------------
 

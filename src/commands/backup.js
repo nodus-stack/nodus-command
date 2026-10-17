@@ -43,7 +43,8 @@ export default async function backupCommand(options) {
       const result = await containerExec(
         config.engine,
         `${config.slug}-mysql`,
-        `mysqldump -u${config.database.user} -p${config.database.password} ${config.database.name}`
+        `mysqldump -u${config.database.user} -p${config.database.password} ${config.database.name}`,
+        { stdio: 'pipe' }
       );
       
       // Save to file

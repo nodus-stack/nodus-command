@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs-extra';
 import inquirer from 'inquirer';
+import { isInteractive } from './interactive.js';
 import { execa } from 'execa';
 
 function getCertificatePaths(projectPath) {
@@ -43,7 +44,21 @@ export async function ensureLocalHttpsCertificate({ domain, projectPath = proces
     throw new Error('mkcert is required for automatic HTTPS certificates. Install it and run "noduscm up" again.');
   }
 
-  if (prompt) {
+  const interactive = isInteractive();
+
+  if (!interactive) {
+    // mkcert -install puede pedir la contraseña del sistema: solo se genera el
+    // certificado si la CA local ya está instalada.
+    let caRoot = '';
+    try {
+      caRoot = (await execa('mkcert', ['-CAROOT'])).stdout.trim();
+    } catch {
+      caRoot = '';
+    }
+    if (!caRoot || !(await fs.pathExists(path.join(caRoot, 'rootCA.pem')))) {
+      throw new Error('The local HTTPS CA is not installed yet. Run "noduscm up" once in a terminal (it runs "mkcert -install"), then retry.');
+    }
+  } else if (prompt) {
     const answer = await inquirer.prompt([
       {
         type: 'confirm',
@@ -58,9 +73,11 @@ export async function ensureLocalHttpsCertificate({ domain, projectPath = proces
     }
   }
 
-  await execa('mkcert', ['-install'], {
-    stdio: 'inherit'
-  });
+  if (interactive) {
+    await execa('mkcert', ['-install'], {
+      stdio: 'inherit'
+    });
+  }
 
   await execa(
     'mkcert',

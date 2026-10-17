@@ -5,9 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.0] - 2026-10-16
 
 ### Added
+- `noduscm mcp`: local MCP server for AI agents (Claude Code, Claude Desktop, your own UI).
+  - Transports: stdio by default; `--http [port]` serves on 127.0.0.1 with a Bearer token, a Host check and an optional `--cors` origin.
+  - Tools: projects, info/status, up/down, logs, WP-CLI, pull, backups (create/list/restore), import-db, generate, rebootstrap and remove. `container_exec` is only available with `--allow-exec`.
+  - Destructive tools require `confirm = <slug>`, and `project_info` never returns passwords.
+- `noduscm connect`: connects this machine to the Nodus connector (outbound WebSocket, no open ports) so Claude can design on local sites and run the MCP tools remotely.
+  - Pair with a one-time code from `/connect` (`--code`); credentials are saved in `~/.config/noduscm/device.json` (mode 600). `--reset` pairs again.
+  - The connector can only reach the loopback URLs of your registered projects (`*.localhost` always resolves to 127.0.0.1).
+  - Pushes to the production branch (`git_publish` direct, or `pr` with `merge_pr`) wait for `y` in the `connect` terminal (10 min timeout; `--no-confirm-publish` turns it off).
+- Git tools: `project_repos`, `git_status` and `git_publish` (commit and publish to the branch connected in production, by direct merge in a temporary worktree or as a PR with `gh`). `site_pair_code` links the local site to the connector.
 - **Theme sync over HTTPS (proof of concept), no SSH required.** Works with sites running the Nodus Jet plugin (REST API `/wp-json/nodus-jet/v1`).
   - `noduscm login --site <url>` — pair with a one-time code generated in wp-admin → Nodus Jet → CLI. The token is stored in `~/.config/noduscm/auth.json` (mode 600), never in the project. `logout` revokes it on the server; `whoami` shows the session.
   - `noduscm theme init --name <name>` creates the theme on the site and a local folder; `theme clone <slug>` downloads an existing CLI theme.
@@ -15,6 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `noduscm theme dev` watches the folder and pushes every change; prints the preview URL (`?nodus_jet_preview=<slug>`).
   - `.noduscmignore` (defaults: `node_modules/`, `.git/`, `*.map`, `.env`). Only whitelisted extensions are synced; dotfiles are never sent.
 - Dependency: `chokidar` (file watching).
+- Project registry at `~/.config/noduscm/projects.json`, updated by `init` and `up`. Use `--root` to discover projects in folders.
+- Non-interactive mode (`NODUSCM_NON_INTERACTIVE=1`, used by the MCP server):
+  - The hosts file and `mkcert -install` steps are skipped with a warning instead of prompting for sudo.
+  - New `noduscm remove --yes` flag.
+
+### Fixed
+- `noduscm backup` crashed because `containerExec` did not return the command output.
+- `noduscm down` uses the project's compose file and exits with code 1 on failure.
+- `--version` now reads the version from `package.json`.
 
 ## [1.3.0] - 2026-03-27
 

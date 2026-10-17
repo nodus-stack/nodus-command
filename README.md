@@ -18,6 +18,7 @@ Modern WordPress local development environment powered by Docker/Podman.
 👤 **cPanel-style user** - Apache container runs as `webuser` (non-root), full sudo available
 🗄️ **Import DB** - Import any `.sql` backup directly into the local container
 ℹ️ **Project Info** - View all project details, URLs, and credentials at a glance
+🤖 **AI agents (MCP)** - `noduscm mcp` lets Claude Code, Claude Desktop or your own agent UI manage local projects
 
 ## Theme sync over HTTPS (Nodus Jet)
 
@@ -264,6 +265,30 @@ wp plugin list         # WP-CLI without sudo
 wp cache flush
 sudo service apache2 restart  # admin commands via sudo (password: webuser)
 ```
+
+### `noduscm mcp`
+Run a local MCP server so AI agents can list, start and stop projects and run WP-CLI. They can also pull from production, take and restore backups, import SQL files and read logs.
+
+```bash
+# Claude Code
+claude mcp add noduscm -- noduscm mcp --root ~/WorkspacePHP
+
+# Your own agent UI over local HTTP (127.0.0.1 + Bearer token)
+NODUSCM_MCP_TOKEN=a-long-token noduscm mcp --http 7337 --cors http://localhost:5173
+```
+
+Commands run non-interactively: nothing asks for passwords or sudo. Destructive tools require `confirm = <project slug>`. See [`examples/13-mcp.en.md`](examples/13-mcp.en.md).
+
+### `noduscm connect`
+Connect this machine to the Nodus connector (the same one you use in claude.ai) so Claude can design templates on your local sites and run the commands above, including Git. The connection is outbound only: no port is opened on your machine.
+
+```bash
+# 1. In https://mcp.nodusproject.dev/connect → "Generar código de equipo"
+# 2. Pair once and keep it running
+noduscm connect --code NCM-XXXX-XXXX --root ~/WorkspacePHP
+```
+
+Typical flow: mount your theme clone in the project, ask Claude to link the local site (`link_local_site`), design and preview, then `git_publish` sends the changes to the branch connected in production (direct merge or PR) and Nodus Jet pulls them there. Before any push to that branch, `noduscm connect` asks you to confirm in the terminal (`--no-confirm-publish` turns it off).
 
 ## Configuration
 
