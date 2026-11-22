@@ -5,6 +5,7 @@ import fs from 'fs-extra';
 import { loadConfig, getProjectPaths } from '../lib/config.js';
 import { downloadWordPress, generateWpConfig, getLocalSiteUrl } from '../lib/wordpress.js';
 import pullCommand from './pull.js';
+import { seedDefaultThemes, ensureHtaccess } from './init-extras.js';
 
 async function ensureWpContentStructure(wpContentPath) {
   if (!await fs.pathExists(wpContentPath)) {
@@ -77,8 +78,10 @@ export default async function rebootstrapCommand(options = {}) {
       await downloadWordPress(wpVersion, projectPath);
       spinner.start('Ensuring wp-content structure...');
       await ensureWpContentStructure(paths.wpContent);
+      await seedDefaultThemes(paths.wpContent, paths.wordpress);
     }
 
+    await ensureHtaccess(paths.wordpress);
     spinner.text = 'Regenerating wp-config.php...';
     const projectName = config.name || config.slug || 'NodusCommand Project';
     const dbConfig = getDbConfigWithHost(config);

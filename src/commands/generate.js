@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs-extra';
 import { loadConfig, getProjectPaths } from '../lib/config.js';
 import { generateDockerCompose, generateDockerfile, generateApacheConfig, generatePhpIni } from '../lib/templates.js';
+import { preserveCustomDefines } from './init-extras.js';
 import { generateWpConfig, getLocalSiteUrl } from '../lib/wordpress.js';
 
 function getDbConfigWithHost(config) {
@@ -50,9 +51,12 @@ export default async function generateCommand() {
       localHttps: config.localHttps,
       localHttpsPort: config.localHttpsPort
     });
-    const wpConfigContent = await generateWpConfig(dbConfig, projectName, localSiteUrl, config.tablePrefix || config.database?.tablePrefix || 'wp_');
+    let wpConfigContent = await generateWpConfig(dbConfig, projectName, localSiteUrl, config.tablePrefix || config.database?.tablePrefix || 'wp_');
     const wpConfigPath = path.join(paths.wordpress, 'wp-config.php');
     await fs.ensureDir(paths.wordpress);
+    if (await fs.pathExists(wpConfigPath)) {
+      wpConfigContent = preserveCustomDefines(await fs.readFile(wpConfigPath, 'utf8'), wpConfigContent);
+    }
     await fs.writeFile(wpConfigPath, wpConfigContent);
 
     spinner.succeed(chalk.green('Docker files generated successfully!'));

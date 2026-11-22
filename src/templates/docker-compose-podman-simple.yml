@@ -9,6 +9,7 @@ services:
         LOCAL_DOMAIN: {{DOMAIN}}
         LOCAL_HTTPS: {{LOCAL_HTTPS}}
     container_name: {{PROJECT_SLUG}}-apache
+    oom_score_adj: 1000
     dns:
       - 8.8.8.8
       - 1.1.1.1

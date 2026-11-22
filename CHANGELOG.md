@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-11-22
+
+### Fixed
+- `noduscm init` (and `rebootstrap`) now copy the default WordPress theme into the project's `wp-content/themes` when it has none; before, the mounted empty `wp-content` left the site without any theme.
+- `noduscm init` creates the standard `wordpress/.htaccess` (never overwrites an existing one), so permalinks and the REST API no longer return 404 on Apache.
+- Podman compose templates set `oom_score_adj: 1000` on the apache service, fixing `podman exec` / `noduscm shell` failures with "Permission denied" when the caller has a high oom_score_adj.
+- Generated `wp-config.php` defines `WP_ENVIRONMENT_TYPE` as `local`.
+- `noduscm generate` keeps the single-line `define()` calls you added by hand to `wp-config.php` instead of discarding them.
+
 ## [1.5.0] - 2026-10-17
 
 ### Added

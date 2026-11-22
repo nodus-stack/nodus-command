@@ -127,6 +127,7 @@ define( 'FS_METHOD', 'direct' );
 define( 'WP_HOME', '${normalizedLocalSiteUrl}' );
 define( 'WP_SITEURL', '${normalizedLocalSiteUrl}' );
 define( 'FORCE_SSL_ADMIN', false );
+define( 'WP_ENVIRONMENT_TYPE', 'local' );
 
 // Table prefix
 $table_prefix = '${tablePrefix}';
