@@ -12,6 +12,7 @@ import { downloadWordPress, generateWpConfig, getLocalSiteUrl } from '../lib/wor
 import { generateDockerCompose, generateApacheConfig, generateDockerfile, generatePhpIni, DEFAULT_PHP_INI } from '../lib/templates.js';
 import { testSSHConnection } from '../lib/ssh.js';
 import { execa } from 'execa';
+import { seedDefaultThemes, ensureHtaccess } from './init-extras.js';
 
 async function ensureWpContentStructure(wpContentPath) {
   if (await fs.pathExists(wpContentPath)) {
@@ -76,12 +77,15 @@ export default async function initCommand(options = {}) {
 
       // Create empty wp-content if needed
       await ensureWpContentStructure(paths.wpContent);
+      await seedDefaultThemes(paths.wpContent, paths.wordpress);
     } else {
       spinner.text = 'Downloading WordPress core...';
       await downloadWordPress(config.wpVersion, projectPath);
       spinner.text = 'Ensuring wp-content structure...';
       await ensureWpContentStructure(paths.wpContent);
     }
+
+    await ensureHtaccess(paths.wordpress);
 
     // Generate wp-config.php
     spinner.text = 'Generating wp-config.php...';
